@@ -11,7 +11,7 @@ from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.utils import secure_filename
 
 from app import db
-from app.models import User, AuditLog, Motorcycle, ServiceEntry, TechnicalSpec, ServiceChecklist
+from app.models import User, Motorcycle, ServiceEntry, TechnicalSpec, ServiceChecklist
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -271,12 +271,6 @@ def user_delete():
             .filter_by(user_id=user_id)
             .all()
         ]
-
-        Motorcycle.query.filter_by(user_id=user_id).delete()
-        ServiceEntry.query.filter_by(user_id=user_id).delete()
-        TechnicalSpec.query.filter_by(user_id=user_id).delete()
-        ServiceChecklist.query.filter_by(user_id=user_id).delete()
-        AuditLog.query.filter_by(user_id=user_id).delete()
 
         upload_folder = Path(current_app.config['UPLOAD_FOLDER'])
         for motorcycle_id in motorcycle_ids:

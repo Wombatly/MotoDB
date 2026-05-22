@@ -9,34 +9,40 @@
   <a class="btn btn-outline-secondary" href="{{ request.referrer or url_for('main.index') }}">Zurück</a>
 </div>
 
-<form class="form-panel" method="post" action="{{ url_for('main.backup_path_update') }}">
-  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-  <h2 class="h5 mb-3">Sicherungsort</h2>
-  <input class="form-control" id="backup_path" name="backup_path" value="{{ backup_path }}" placeholder="/PFAD/ZUM/SICHERUNGSORDNER" aria-label="Sicherungsort">
-
-  <div class="d-flex gap-2 mt-4">
-    <button class="btn btn-primary" type="submit">Speichern</button>
-  </div>
-</form>
-
 <section class="form-panel mt-3">
   <h2 class="h5 mb-3">Konto</h2>
-  <a class="btn btn-outline-secondary" href="{{ url_for('auth.change_password') }}">Passwort ändern</a>
-</section>
-
-<section class="form-panel mt-3">
-  <h2 class="h5 mb-3">Checklisten</h2>
+  <p class="text-secondary">{{ current_user.email }}</p>
   <div class="d-flex gap-2">
-    <a class="btn btn-outline-secondary" href="{{ url_for('main.checklist_new_global') }}">Checkliste anlegen</a>
-    <a class="btn btn-outline-secondary" href="{{ url_for('main.checklist_csv_template') }}">Checklisten-Vorlage</a>
+    <a class="btn btn-outline-secondary" href="{{ url_for('auth.change_password') }}">Passwort ändern</a>
+    <a class="btn btn-outline-danger" href="{{ url_for('auth.user_delete') }}">Profil löschen</a>
   </div>
 </section>
 
-<section class="form-panel mt-3">
-  <h2 class="h5 mb-3">Datenblätter</h2>
-  <div class="d-flex gap-2">
-    <a class="btn btn-outline-secondary" href="{{ url_for('main.technical_data_global') }}">Technische Daten</a>
-    <a class="btn btn-outline-secondary" href="{{ url_for('main.technical_csv_template') }}">Datenblatt-Vorlage</a>
-  </div>
-</section>
+{% if current_user.is_admin %}
+  <form class="form-panel mt-3" method="post" action="{{ url_for('main.backup_path_update') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <h2 class="h5 mb-3">Sicherungsort</h2>
+    <input class="form-control" id="backup_path" name="backup_path" value="{{ backup_path }}" placeholder="/PFAD/ZUM/SICHERUNGSORDNER" aria-label="Sicherungsort">
+
+    <div class="d-flex gap-2 mt-4">
+      <button class="btn btn-primary" type="submit">Speichern</button>
+    </div>
+  </form>
+
+  <section class="form-panel mt-3">
+    <h2 class="h5 mb-3">Checklisten</h2>
+    <div class="d-flex gap-2">
+      <a class="btn btn-outline-secondary" href="{{ url_for('main.checklist_new_global') }}">Checkliste anlegen</a>
+      <a class="btn btn-outline-secondary" href="{{ url_for('main.checklist_csv_template') }}">Checklisten-Vorlage</a>
+    </div>
+  </section>
+
+  <section class="form-panel mt-3">
+    <h2 class="h5 mb-3">Datenblätter</h2>
+    <div class="d-flex gap-2">
+      <a class="btn btn-outline-secondary" href="{{ url_for('main.technical_data_global') }}">Technische Daten</a>
+      <a class="btn btn-outline-secondary" href="{{ url_for('main.technical_csv_template') }}">Datenblatt-Vorlage</a>
+    </div>
+  </section>
+{% endif %}
 {% endblock %}

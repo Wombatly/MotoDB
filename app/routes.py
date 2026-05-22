@@ -118,7 +118,6 @@ def backup_path_update():
 
 @bp.route("/einstellungen")
 @login_required
-@admin_required
 def settings():
     return render_template("settings.html")
 

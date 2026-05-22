@@ -21,9 +21,7 @@
           </button>
           <div class="nav-actions" data-menu>
             {% if current_user.is_authenticated %}
-              {% if current_user.is_admin %}
-                <a class="menu-item" href="{{ url_for('main.settings') }}">Einstellungen</a>
-              {% endif %}
+              <a class="menu-item" href="{{ url_for('main.settings') }}">Einstellungen</a>
               <form method="post" action="{{ url_for('auth.logout') }}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button class="menu-item" type="submit">Abmelden</button>

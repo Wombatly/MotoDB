@@ -1,32 +1,33 @@
 {% extends "base.html" %}
 
+{% block title %}Profil löschen{% endblock %}
+
 {% block content %}
-<div class="container mt-5">
-    <div class="row justify-content-center">
-        <div class="col-md-6">
-            <div class="card border-danger">
-                <div class="card-body">
-                    <h2 class="card-title text-center text-danger mb-4">Konto löschen</h2>
-                    <div class="alert alert-warning">
-                        <strong>Warnung:</strong> Diese Aktion kann nicht rückgängig gemacht werden!
-                        <ul class="mb-0 mt-2">
-                            <li>Alle deine Motorräder, Services und Checklisten werden gelöscht</li>
-                            <li>Alle hochgeladenen Bilder und Belege werden gelöscht</li>
-                            <li>Dein Konto wird dauerhaft gelöscht</li>
-                        </ul>
-                    </div>
-                    <form method="POST">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <div class="mb-3">
-                            <label for="confirmation" class="form-label">Gib "jaloeschen" ein zur Bestätigung:</label>
-                            <input type="text" class="form-control" id="confirmation" name="confirmation" required>
-                        </div>
-                        <button type="submit" class="btn btn-danger w-100">Konto und Daten löschen</button>
-                        <a href="{{ url_for('main.index') }}" class="btn btn-secondary w-100 mt-2">Abbrechen</a>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
+<div class="d-flex align-items-start justify-content-between gap-3 mb-3">
+  <div>
+    <h1 class="h3 mb-1 text-danger">Profil löschen</h1>
+    <p class="text-secondary mb-0">{{ current_user.email }}</p>
+  </div>
+  <a class="btn btn-outline-secondary" href="{{ url_for('main.settings') }}">Zurück</a>
 </div>
+
+<section class="form-panel">
+  <div class="alert alert-warning">
+    <strong>Warnung:</strong> Diese Aktion kann nicht rückgängig gemacht werden.
+    <ul class="mb-0 mt-2">
+      <li>Alle deine Motorräder, Services und Checklisten werden gelöscht</li>
+      <li>Alle hochgeladenen Bilder und Belege werden gelöscht</li>
+      <li>Dein Nutzerprofil wird dauerhaft gelöscht</li>
+    </ul>
+  </div>
+
+  <form method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="mb-3">
+      <label for="confirmation" class="form-label">Gib "jaloeschen" ein zur Bestätigung:</label>
+      <input type="text" class="form-control" id="confirmation" name="confirmation" required autofocus>
+    </div>
+    <button type="submit" class="btn btn-danger">Profil und Daten löschen</button>
+  </form>
+</section>
 {% endblock %}

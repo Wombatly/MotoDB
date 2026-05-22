@@ -1,10 +1,12 @@
 import os
 import tempfile
 import unittest
+from datetime import date
+from pathlib import Path
 from unittest.mock import patch
 
 from app import create_app, db
-from app.models import Motorcycle, User
+from app.models import Motorcycle, ServiceChecklist, ServiceChecklistItem, ServiceEntry, User
 
 
 class SecurityTestCase(unittest.TestCase):
@@ -114,6 +116,78 @@ class SecurityTestCase(unittest.TestCase):
                 session["_fresh"] = True
 
             self.assertEqual(client.get(upload_url).status_code, 403)
+
+    def test_user_settings_offer_profile_deletion(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            app = self.build_app(tempdir)
+            with app.app_context():
+                user = User(username="rider", email="rider@example.com")
+                user.set_password("rider-password")
+                db.session.add(user)
+                db.session.commit()
+                user_id = user.id
+
+            client = app.test_client()
+            with client.session_transaction() as session:
+                session["_user_id"] = str(user_id)
+                session["_fresh"] = True
+
+            response = client.get("/einstellungen")
+
+            self.assertEqual(response.status_code, 200)
+            self.assertIn(b"Einstellungen", response.data)
+            self.assertIn(b"Profil l", response.data)
+            self.assertNotIn(b"Sicherungsort", response.data)
+
+    def test_profile_deletion_removes_user_data_and_uploads(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            app = self.build_app(tempdir)
+            app.config.update(WTF_CSRF_ENABLED=False)
+            with app.app_context():
+                user = User(username="delete-me", email="delete-me@example.com")
+                user.set_password("delete-me-password")
+                db.session.add(user)
+                db.session.flush()
+                motorcycle = Motorcycle(user_id=user.id, marke="Honda", modell="CB500")
+                db.session.add(motorcycle)
+                db.session.flush()
+                service = ServiceEntry(
+                    user_id=user.id,
+                    motorrad_id=motorcycle.id,
+                    datum=date(2026, 5, 22),
+                    kategorie="Wartung",
+                )
+                checklist = ServiceChecklist(
+                    user_id=user.id,
+                    motorrad_id=motorcycle.id,
+                    titel="Jahresservice",
+                )
+                db.session.add_all([service, checklist])
+                db.session.flush()
+                db.session.add(ServiceChecklistItem(checklist_id=checklist.id, text="Oelstand", position=1))
+                db.session.commit()
+
+                user_id = user.id
+                motorcycle_id = motorcycle.id
+                upload_folder = Path(app.config["UPLOAD_FOLDER"]) / str(motorcycle_id)
+                upload_folder.mkdir(parents=True)
+                (upload_folder / "beleg.txt").write_text("delete", encoding="utf-8")
+
+            client = app.test_client()
+            with client.session_transaction() as session:
+                session["_user_id"] = str(user_id)
+                session["_fresh"] = True
+
+            response = client.post("/user/delete", data={"confirmation": "jaloeschen"})
+
+            self.assertEqual(response.status_code, 302)
+            self.assertEqual(response.headers["Location"], "/login")
+            self.assertFalse(upload_folder.exists())
+            with app.app_context():
+                self.assertIsNone(db.session.get(User, user_id))
+                self.assertEqual(ServiceEntry.query.count(), 0)
+                self.assertEqual(ServiceChecklist.query.count(), 0)
+                self.assertEqual(ServiceChecklistItem.query.count(), 0)
 
 
 if __name__ == "__main__":

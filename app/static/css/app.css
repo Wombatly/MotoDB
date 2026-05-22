@@ -396,6 +396,11 @@ a {
   color: #fff;
 }
 
+.btn-danger {
+  background: #b91c1c;
+  color: #fff;
+}
+
 .btn-outline-secondary {
   background: #fff;
   border-color: #aab4c1;
