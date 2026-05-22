@@ -54,6 +54,30 @@ class SecurityTestCase(unittest.TestCase):
                 "; ".join(login_response.headers.getlist("Set-Cookie")),
             )
 
+    def test_public_hosting_explains_http_login_block(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            app = self.build_app(
+                tempdir,
+                MOTODB_PUBLIC_HOSTING="true",
+                MOTODB_ADMIN_USERNAME="admin",
+                MOTODB_ADMIN_EMAIL="admin@example.com",
+                MOTODB_ADMIN_PASSWORD="public-test-password",
+            )
+            client = app.test_client()
+
+            login_response = client.get("/login", base_url="http://motodb.example")
+            csrf_response = client.post(
+                "/login",
+                base_url="http://motodb.example",
+                data={"email": "admin@example.com", "password": "public-test-password"},
+            )
+
+            self.assertEqual(login_response.status_code, 400)
+            self.assertIn(b"HTTPS", login_response.data)
+            self.assertIn(b"MOTODB_PUBLIC_HOSTING", login_response.data)
+            self.assertEqual(csrf_response.status_code, 400)
+            self.assertIn(b"HTTPS", csrf_response.data)
+
     def test_csrf_rejects_post_without_token_and_logout_is_not_get(self):
         with tempfile.TemporaryDirectory() as tempdir:
             app = self.build_app(tempdir)

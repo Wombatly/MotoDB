@@ -70,6 +70,9 @@ def register():
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
+    if current_app.config["MOTODB_PUBLIC_HOSTING"] and not request.is_secure:
+        return render_template('auth/login.html', https_required=True), 400
+
     if request.method == 'POST':
         email = request.form.get('email', '').strip()
         password = request.form.get('password', '')
@@ -90,7 +93,7 @@ def login():
 
         return redirect(url_for('main.index'))
 
-    return render_template('auth/login.html')
+    return render_template('auth/login.html', https_required=False)
 
 
 @auth_bp.route('/logout', methods=['POST'])

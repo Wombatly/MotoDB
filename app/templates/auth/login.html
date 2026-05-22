@@ -7,22 +7,29 @@
             <div class="card">
                 <div class="card-body">
                     <h2 class="card-title text-center mb-4">Anmelden</h2>
-                    <form method="POST">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <div class="mb-3">
-                            <label for="email" class="form-label">Email</label>
-                            <input type="email" class="form-control" id="email" name="email" required autofocus>
+                    {% if https_required %}
+                        <div class="alert alert-danger mb-0">
+                            Public Hosting erwartet HTTPS. Öffne die App über HTTPS oder deaktiviere
+                            <code>MOTODB_PUBLIC_HOSTING</code> für ein lokales HTTP-Deployment.
                         </div>
-                        <div class="mb-3">
-                            <label for="password" class="form-label">Passwort</label>
-                            <input type="password" class="form-control" id="password" name="password" required>
-                        </div>
-                        <button type="submit" class="btn btn-primary w-100">Anmelden</button>
-                    </form>
-                    {% if config.MOTODB_ALLOW_REGISTRATION %}
-                        <div class="text-center mt-3">
-                            <p>Noch kein Konto? <a href="{{ url_for('auth.register') }}">Jetzt registrieren</a></p>
-                        </div>
+                    {% else %}
+                        <form method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <div class="mb-3">
+                                <label for="email" class="form-label">Email</label>
+                                <input type="email" class="form-control" id="email" name="email" required autofocus>
+                            </div>
+                            <div class="mb-3">
+                                <label for="password" class="form-label">Passwort</label>
+                                <input type="password" class="form-control" id="password" name="password" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary w-100">Anmelden</button>
+                        </form>
+                        {% if config.MOTODB_ALLOW_REGISTRATION %}
+                            <div class="text-center mt-3">
+                                <p>Noch kein Konto? <a href="{{ url_for('auth.register') }}">Jetzt registrieren</a></p>
+                            </div>
+                        {% endif %}
                     {% endif %}
                 </div>
             </div>

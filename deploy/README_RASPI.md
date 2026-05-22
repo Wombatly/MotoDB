@@ -112,6 +112,10 @@ Datenbank benötigt. Öffentliche Selbstregistrierung bleibt im Public-Hosting-
 Modus deaktiviert, solange `MOTODB_ALLOW_REGISTRATION=true` nicht bewusst
 gesetzt wird.
 
+Wenn die Pi-Instanz im Heimnetz nur über HTTP erreichbar ist, die Public-
+Hosting-Zeilen auskommentiert lassen. Sonst werden die sicheren Session-Cookies
+vom Browser nicht gespeichert und der Login kann nicht abgeschlossen werden.
+
 ## 7. Container starten
 
 ```bash
@@ -141,6 +145,10 @@ Danach im Heimnetz öffnen:
 ```text
 http://192.168.178.102/
 ```
+
+Diese HTTP-Adresse ist für den Heimnetz-Betrieb ohne
+`MOTODB_PUBLIC_HOSTING=true` gedacht. Für Public Hosting muss die externe URL
+über HTTPS bereitstehen.
 
 ## 9. Firewall
 

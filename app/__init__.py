@@ -2,7 +2,7 @@ from datetime import datetime
 import os
 from pathlib import Path
 
-from flask import Flask
+from flask import Flask, request
 from flask_wtf.csrf import CSRFError, CSRFProtect
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
@@ -95,6 +95,13 @@ def create_app():
 
     @app.errorhandler(CSRFError)
     def handle_csrf_error(error):
+        if app.config["MOTODB_PUBLIC_HOSTING"] and not request.is_secure:
+            return (
+                "Formularanfragen ueber HTTP sind im Public-Hosting-Modus blockiert. "
+                "Oeffne die App ueber HTTPS oder deaktiviere "
+                "MOTODB_PUBLIC_HOSTING fuer ein lokales HTTP-Deployment.",
+                400,
+            )
         return "Ungueltige oder abgelaufene Formularanfrage.", 400
 
     from app.routes import bp

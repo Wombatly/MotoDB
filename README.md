@@ -683,6 +683,12 @@ Sicherheitsheader, CSRF-Schutz für Formulare und JSON-POSTs sowie Startchecks
 gegen den Entwicklungs-Secret-Key und das bekannte Default-Admin-Passwort.
 Uploads werden nur noch nach Login und Eigentümerprüfung ausgeliefert.
 
+HTTP-Deployments im Heimnetz dürfen `MOTODB_PUBLIC_HOSTING` nicht aktivieren.
+Sichere Session-Cookies werden über HTTP vom Browser nicht gespeichert; der
+Login kann dann nicht abgeschlossen werden. Für Public Hosting muss die
+externe URL über HTTPS laufen und bei einem Reverse Proxy muss Flask das
+HTTPS-Schema über die Proxy-Header sehen.
+
 ## Wichtige Routen
 
 | Route | Zweck |
@@ -740,6 +746,14 @@ Im Dockerbetrieb liegt die Datenbank unter:
 ```text
 /data/motorcycle_service.sqlite3
 ```
+
+### Login bleibt im Public-Hosting-Modus stehen
+
+Wenn die Login-Seite meldet, dass Public Hosting HTTPS erwartet, wird die App
+über HTTP geöffnet, während `MOTODB_PUBLIC_HOSTING=true` gesetzt ist. Für ein
+lokales HTTP-Deployment diese Variable aus `.env` entfernen oder auskommentiert
+lassen. Für öffentliches Hosting die App ausschließlich über HTTPS öffnen und
+bei einem Reverse Proxy `MOTODB_TRUST_PROXY_HEADERS=true` setzen.
 
 ### Uploads fehlen nach Deployment
 
