@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card border-danger">
+                <div class="card-body">
+                    <h2 class="card-title text-center text-danger mb-4">Konto löschen</h2>
+                    <div class="alert alert-warning">
+                        <strong>Warnung:</strong> Diese Aktion kann nicht rückgängig gemacht werden!
+                        <ul class="mb-0 mt-2">
+                            <li>Alle deine Motorräder, Services und Checklisten werden gelöscht</li>
+                            <li>Alle hochgeladenen Bilder und Belege werden gelöscht</li>
+                            <li>Dein Konto wird dauerhaft gelöscht</li>
+                        </ul>
+                    </div>
+                    <form method="POST">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <div class="mb-3">
+                            <label for="confirmation" class="form-label">Gib "jaloeschen" ein zur Bestätigung:</label>
+                            <input type="text" class="form-control" id="confirmation" name="confirmation" required>
+                        </div>
+                        <button type="submit" class="btn btn-danger w-100">Konto und Daten löschen</button>
+                        <a href="{{ url_for('main.index') }}" class="btn btn-secondary w-100 mt-2">Abbrechen</a>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

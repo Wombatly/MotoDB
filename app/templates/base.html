@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#1f2937">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>{% block title %}MotoDB{% endblock %}</title>
+    <link rel="manifest" href="{{ url_for('main.manifest') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+  </head>
+  <body>
+    <nav class="navbar navbar-expand bg-dark navbar-dark sticky-top">
+      <div class="container">
+        <a class="navbar-brand fw-semibold" href="{{ url_for('main.index') }}">MotoDB</a>
+        <div class="nav-menu">
+          <button class="menu-toggle" type="button" data-menu-toggle aria-expanded="false" aria-label="Menü öffnen">
+            <span></span>
+            <span></span>
+            <span></span>
+          </button>
+          <div class="nav-actions" data-menu>
+            {% if current_user.is_authenticated %}
+              {% if current_user.is_admin %}
+                <a class="menu-item" href="{{ url_for('main.settings') }}">Einstellungen</a>
+              {% endif %}
+              <form method="post" action="{{ url_for('auth.logout') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="menu-item" type="submit">Abmelden</button>
+              </form>
+              <button class="menu-item" id="syncButton" type="button">Sync</button>
+            {% else %}
+              <a class="menu-item" href="{{ url_for('auth.login') }}">Anmelden</a>
+              {% if config.MOTODB_ALLOW_REGISTRATION %}
+                <a class="menu-item" href="{{ url_for('auth.register') }}">Registrieren</a>
+              {% endif %}
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <main class="container py-3 py-md-4">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="flash-list" role="status" aria-live="polite">
+            {% for category, message in messages %}
+              <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+      {% block content %}{% endblock %}
+    </main>
+
+    <div class="toast-container">
+      <div id="appToast" class="toast" role="status" aria-live="polite" aria-atomic="true">
+        <div class="d-flex">
+          <div class="toast-body" id="appToastBody"></div>
+          <button type="button" class="toast-close" data-toast-close aria-label="Schließen">×</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/indexeddb.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/sync.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+  </body>
+</html>

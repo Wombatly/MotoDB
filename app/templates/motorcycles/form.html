@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between gap-3 mb-3">
+  <h1 class="h3 mb-0">{{ title }}</h1>
+  <a class="btn btn-outline-secondary" href="{{ url_for('main.index') }}">Zurück</a>
+</div>
+
+<form method="post" enctype="multipart/form-data" class="form-panel">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="row g-3">
+    {% if motorcycle.id and motorcycle.bild %}
+      <div class="col-12">
+        <div class="edit-image-preview">
+          <img src="{{ url_for('main.uploaded_file', filename=motorcycle.bild) }}" alt="{{ motorcycle.marke }} {{ motorcycle.modell }}">
+          <button class="image-delete-button" type="submit" form="delete-image-form" aria-label="Bild löschen">×</button>
+        </div>
+      </div>
+    {% endif %}
+    <div class="col-12 col-md-6">
+      <label class="form-label" for="marke">Marke</label>
+      <input class="form-control" id="marke" name="marke" value="{{ motorcycle.marke or '' }}" required>
+    </div>
+    <div class="col-12 col-md-6">
+      <label class="form-label" for="modell">Modell</label>
+      <input class="form-control" id="modell" name="modell" value="{{ motorcycle.modell or '' }}" required>
+    </div>
+    <div class="col-6 col-md-3">
+      <label class="form-label" for="baujahr">Baujahr</label>
+      <input class="form-control" id="baujahr" name="baujahr" inputmode="numeric" value="{{ motorcycle.baujahr or '' }}">
+    </div>
+    <div class="col-6 col-md-3">
+      <label class="form-label" for="hubraum">Hubraum</label>
+      <input class="form-control number-input" id="hubraum" name="hubraum" inputmode="numeric" value="{{ motorcycle.hubraum or '' }}">
+    </div>
+    <div class="col-6 col-md-3">
+      <label class="form-label" for="ps">PS</label>
+      <input class="form-control number-input" id="ps" name="ps" inputmode="numeric" value="{{ motorcycle.ps or '' }}">
+    </div>
+    <div class="col-12 col-md-4">
+      <label class="form-label" for="farbe">Farbe</label>
+      <input class="form-control" id="farbe" name="farbe" value="{{ motorcycle.farbe or '' }}">
+    </div>
+    <div class="col-12 col-md-4">
+      <label class="form-label" for="kennzeichen">Kennzeichen</label>
+      <input class="form-control" id="kennzeichen" name="kennzeichen" value="{{ motorcycle.kennzeichen or '' }}">
+    </div>
+    <div class="col-12 col-md-4">
+      <label class="form-label" for="vin">Fahrgestellnummer</label>
+      <input class="form-control" id="vin" name="vin" value="{{ motorcycle.vin or '' }}">
+    </div>
+    <div class="col-12 col-md-4">
+      <label class="form-label" for="kaufdatum">Kaufdatum</label>
+      <input class="form-control" id="kaufdatum" name="kaufdatum" type="date" value="{{ motorcycle.kaufdatum }}">
+    </div>
+    <div class="col-12 col-md-4">
+      <label class="form-label" for="kaufpreis">Kaufpreis</label>
+      <input class="form-control number-input" id="kaufpreis" name="kaufpreis" inputmode="numeric" value="{{ motorcycle.kaufpreis or '' }}">
+    </div>
+    <div class="col-12 col-md-4">
+      <label class="form-label" for="erstzulassung">Erstzulassung</label>
+      <input class="form-control" id="erstzulassung" name="erstzulassung" type="date" value="{{ motorcycle.erstzulassung }}">
+    </div>
+    <div class="col-12 col-md-4">
+      <label class="form-label" for="verkauft_am">Verkauft am</label>
+      <input class="form-control" id="verkauft_am" name="verkauft_am" type="date" value="{{ motorcycle.verkauft_am }}">
+    </div>
+    <div class="col-12 col-md-4">
+      <label class="form-label" for="verkaufspreis">Verkaufspreis</label>
+      <input class="form-control number-input" id="verkaufspreis" name="verkaufspreis" inputmode="numeric" value="{{ motorcycle.verkaufspreis or '' }}">
+    </div>
+    <div class="col-12 col-md-4 d-flex align-items-end">
+      <div class="form-check mb-2">
+        <input class="form-check-input" id="aktiv" name="aktiv" type="checkbox" {% if motorcycle.aktiv or motorcycle.id is none %}checked{% endif %}>
+        <label class="form-check-label" for="aktiv">Aktiv</label>
+      </div>
+    </div>
+    <div class="col-12">
+      <label class="form-label" for="notizen">Notizen</label>
+      <textarea class="form-control" id="notizen" name="notizen" rows="4">{{ motorcycle.notizen or '' }}</textarea>
+    </div>
+    <div class="col-12">
+      <label class="form-label" for="bild">Bild</label>
+      <input class="form-control" id="bild" name="bild" type="file" accept="image/*">
+    </div>
+  </div>
+
+  <div class="form-actions mt-4">
+    <div class="d-flex gap-2">
+      <button class="btn btn-primary" type="submit">Speichern</button>
+      {% if motorcycle.id %}
+        <a class="btn btn-outline-secondary" href="{{ url_for('main.motorcycle_detail', motorrad_id=motorcycle.id) }}">Abbrechen</a>
+      {% endif %}
+    </div>
+    {% if motorcycle.id %}
+      <div class="d-flex gap-2">
+        <button class="btn btn-outline-danger" type="submit" form="delete-motorcycle-form">Motorrad löschen</button>
+      </div>
+    {% endif %}
+  </div>
+</form>
+
+{% if motorcycle.id and motorcycle.bild %}
+  <form method="post" action="{{ url_for('main.motorcycle_image_delete', motorrad_id=motorcycle.id) }}" id="delete-image-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  </form>
+{% endif %}
+{% if motorcycle.id %}
+  <form method="post" action="{{ url_for('main.motorcycle_delete', motorrad_id=motorcycle.id) }}" id="delete-motorcycle-form" data-confirm="Dieses Motorrad wirklich löschen?">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  </form>
+{% endif %}
+{% endblock %}

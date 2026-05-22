@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Checkliste anlegen{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-start justify-content-between gap-3 mb-3">
+  <div>
+    <h1 class="h3 mb-1">Checkliste anlegen</h1>
+    <p class="text-secondary mb-0">Vorlage mit Prüfpunkten und Kommentaren speichern.</p>
+  </div>
+  {% if motorcycle %}
+    <a class="btn btn-outline-secondary" href="{{ url_for('main.checklist_index', motorrad_id=motorcycle.id) }}">Zurück</a>
+  {% else %}
+    <a class="btn btn-outline-secondary" href="{{ url_for('main.index') }}">Zurück</a>
+  {% endif %}
+</div>
+
+<form method="post" class="form-panel" enctype="multipart/form-data">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="preset" value="{{ preset_key }}">
+  <div class="row g-3">
+    <div class="col-12">
+      <label class="form-label" for="motorrad_id">Motorrad</label>
+      <select class="form-select" id="motorrad_id" name="motorrad_id" required>
+        {% for option in motorcycles %}
+          <option value="{{ option.id }}" {% if motorcycle and option.id == motorcycle.id %}selected{% endif %}>{{ option.marke }} {{ option.modell }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-12">
+      <label class="form-label" for="titel">Titel</label>
+      <input class="form-control" id="titel" name="titel" value="{{ preset.titel or '' }}" required>
+    </div>
+    <div class="col-6 col-md-2">
+      <label class="form-label" for="intervall_km">km</label>
+      <input class="form-control number-input" id="intervall_km" name="intervall_km" inputmode="numeric" value="{{ preset.intervall_km or '' }}">
+    </div>
+    <div class="col-6 col-md-2">
+      <label class="form-label" for="intervall_monate">Intervall</label>
+      <input class="form-control number-input" id="intervall_monate" name="intervall_monate" inputmode="numeric" value="{{ preset.intervall_monate or '' }}">
+    </div>
+  </div>
+
+  <div class="import-panel mt-4">
+    <h2 class="h5 mb-2">CSV einlesen</h2>
+    <p class="text-secondary mb-2">Format: Motorrad;Titel;km;Intervall;Position;Pruefpunkt;Kommentar</p>
+    <input class="form-control" id="csv_file" name="csv_file" type="file" accept=".csv,text/csv">
+  </div>
+
+  <h2 class="h5 mt-4 mb-3">Prüfpunkte</h2>
+  <div class="checklist-builder">
+    {% set preset_items = preset.get("items", []) %}
+    {% for item in preset_items %}
+      <div class="checklist-builder-row">
+        <div>
+          <label class="form-label">Prüfpunkt</label>
+          <input class="form-control" name="item_text" value="{{ item }}">
+        </div>
+        <div>
+          <label class="form-label">Kommentar</label>
+          <textarea class="form-control" name="item_comment" rows="2"></textarea>
+        </div>
+      </div>
+    {% endfor %}
+    {% for _ in range(10 - preset_items|length if preset_items|length < 10 else 3) %}
+      <div class="checklist-builder-row">
+        <div>
+          <label class="form-label">Prüfpunkt</label>
+          <input class="form-control" name="item_text" value="">
+        </div>
+        <div>
+          <label class="form-label">Kommentar</label>
+          <textarea class="form-control" name="item_comment" rows="2"></textarea>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+
+  <div class="row g-3">
+    <div class="col-12">
+      <label class="form-label" for="anmerkungen">Anmerkungen</label>
+      <textarea class="form-control" id="anmerkungen" name="anmerkungen" rows="3"></textarea>
+    </div>
+  </div>
+  <div class="d-flex gap-2 mt-4">
+    <button class="btn btn-primary" type="submit">Anlegen</button>
+    {% if motorcycle %}
+      <a class="btn btn-outline-secondary" href="{{ url_for('main.checklist_index', motorrad_id=motorcycle.id) }}">Abbrechen</a>
+    {% else %}
+      <a class="btn btn-outline-secondary" href="{{ url_for('main.index') }}">Abbrechen</a>
+    {% endif %}
+  </div>
+</form>
+{% endblock %}

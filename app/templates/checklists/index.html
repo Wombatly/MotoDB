@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Service-Checklisten{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-start justify-content-between gap-3 mb-3">
+  <div>
+    <h1 class="h3 mb-1">Service-Checklisten</h1>
+    <p class="text-secondary mb-0">{{ motorcycle.marke }} {{ motorcycle.modell }}</p>
+  </div>
+  <a class="btn btn-outline-secondary" href="{{ url_for('main.motorcycle_detail', motorrad_id=motorcycle.id) }}">Zurück</a>
+</div>
+
+<section class="mb-4">
+  <h2 class="h5 mb-3">Vorlagen</h2>
+  {% if checklist_templates %}
+    <div class="service-list">
+      {% for checklist in checklist_templates %}
+        <article class="service-entry">
+          <div class="d-flex justify-content-between gap-3">
+            <div>
+              <h3 class="h6 mb-1">{{ checklist.titel }}</h3>
+              <p class="text-secondary mb-2">
+                Vorlage
+                {% if checklist.intervall_km %} · {{ checklist.intervall_km|number }} km{% endif %}
+                {% if checklist.intervall_monate %} · {{ checklist.intervall_monate|number }} Monate{% endif %}
+                · {{ checklist.items|length }} Prüfpunkte
+              </p>
+            </div>
+          </div>
+          <div class="d-flex gap-2 flex-wrap">
+            <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('main.checklist_edit', checklist_id=checklist.id) }}">Ausfüllen</a>
+            <form method="post" action="{{ url_for('main.checklist_delete', checklist_id=checklist.id) }}" data-confirm="Diese Checkliste wirklich löschen?">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-sm btn-outline-danger" type="submit">Löschen</button>
+            </form>
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="text-secondary">Noch keine Vorlagen gespeichert.</p>
+  {% endif %}
+</section>
+
+<section>
+  <h2 class="h5 mb-3">Abgeschlossene Datensätze</h2>
+  {% if checklist_records %}
+    <div class="service-list">
+      {% for checklist in checklist_records %}
+        <article class="service-entry">
+          <div class="d-flex justify-content-between gap-3">
+            <div>
+              <h3 class="h6 mb-1">{{ checklist.titel }}</h3>
+              <p class="text-secondary mb-2">
+                {{ checklist.datum|date_de }}
+                {% if checklist.kilometerstand %} · {{ checklist.kilometerstand|number }} km{% endif %}
+                {% if checklist.intervall_km %} · {{ checklist.intervall_km|number }} km{% endif %}
+              </p>
+            </div>
+            <strong>{{ checklist.items|selectattr("erledigt")|list|length }}/{{ checklist.items|length }}</strong>
+          </div>
+          <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('main.checklist_edit', checklist_id=checklist.id) }}">Anzeigen</a>
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="text-secondary">Noch keine abgeschlossenen Datensätze vorhanden.</p>
+  {% endif %}
+</section>
+{% endblock %}

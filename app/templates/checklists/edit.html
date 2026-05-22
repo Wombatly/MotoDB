@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}{% if checklist.is_template %}Checkliste ausfüllen{% else %}Checklisten-Datensatz{% endif %}{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-start justify-content-between gap-3 mb-3">
+  <div>
+    <h1 class="h3 mb-1">{% if checklist.is_template %}Checkliste ausfüllen{% else %}Checklisten-Datensatz{% endif %}</h1>
+    <p class="text-secondary mb-0">
+      {{ motorcycle.marke }} {{ motorcycle.modell }}
+      {% if not checklist.is_template %} · unveränderlich gespeichert{% endif %}
+    </p>
+  </div>
+  <a class="btn btn-outline-secondary" href="{{ url_for('main.motorcycle_detail', motorrad_id=motorcycle.id) }}">Zurück</a>
+</div>
+
+<form method="post" class="form-panel">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="row g-3 mb-3">
+    <div class="col-12">
+      <label class="form-label" for="titel">Titel</label>
+      <input class="form-control" id="titel" name="titel" value="{{ checklist.titel }}" {% if not checklist.is_template %}disabled{% endif %} required>
+    </div>
+    <div class="col-12 col-md-6">
+      <label class="form-label" for="datum">Datum</label>
+      <input class="form-control" id="datum" name="datum" type="date" value="{{ checklist.datum }}" {% if not checklist.is_template %}disabled{% endif %}>
+    </div>
+    <div class="col-12 col-md-6">
+      <label class="form-label" for="kilometerstand">Kilometerstand</label>
+      <input class="form-control number-input" id="kilometerstand" name="kilometerstand" inputmode="numeric" value="{{ checklist.kilometerstand or '' }}" {% if not checklist.is_template %}disabled{% endif %}>
+    </div>
+  </div>
+
+  <div class="checklist-items">
+    {% for item in checklist.items %}
+      <div class="checklist-item">
+        <label class="checklist-item__check">
+          <input type="checkbox" name="erledigt" value="{{ item.id }}" {% if item.erledigt %}checked{% endif %} {% if not checklist.is_template %}disabled{% endif %}>
+          <span>{{ item.text }}</span>
+        </label>
+        {% if item.kommentar_vorlage %}
+          <p class="checklist-item__comment">{{ item.kommentar_vorlage }}</p>
+        {% endif %}
+        {% if checklist.is_template %}
+          <textarea class="form-control" name="anmerkung_{{ item.id }}" rows="2" placeholder="Anmerkung zum ausgefüllten Datensatz"></textarea>
+        {% elif item.anmerkung %}
+          <p class="checklist-item__note">{{ item.anmerkung }}</p>
+        {% endif %}
+      </div>
+    {% endfor %}
+  </div>
+
+  <label class="form-label mt-4" for="anmerkungen">{% if checklist.is_template %}Gesamtanmerkung zum Datensatz{% else %}Gesamtanmerkung{% endif %}</label>
+  <textarea class="form-control" id="anmerkungen" name="anmerkungen" rows="4" {% if not checklist.is_template %}disabled{% endif %}>{{ "" if checklist.is_template else checklist.anmerkungen or "" }}</textarea>
+
+  <div class="d-flex gap-2 mt-4">
+    {% if checklist.is_template %}
+      <button class="btn btn-primary" type="submit">Als Datensatz speichern</button>
+    {% endif %}
+    <a class="btn btn-outline-secondary" href="{{ url_for('main.motorcycle_detail', motorrad_id=motorcycle.id) }}">Abbrechen</a>
+  </div>
+</form>
+{% endblock %}

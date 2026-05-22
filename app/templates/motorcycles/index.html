@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Motorräder{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between gap-3 mb-3">
+  <div>
+    <h1 class="h3 mb-1">Motorräder</h1>
+    <p class="text-secondary mb-0">Deine Garage auf einen Blick.</p>
+  </div>
+  <a class="btn btn-primary" href="{{ url_for('main.motorcycle_new') }}">Neu</a>
+</div>
+
+{% if motorcycles %}
+  <div class="motorcycle-grid">
+    {% for motorcycle in motorcycles %}
+      <article class="motorcycle-card">
+        <a class="motorcycle-card__link" href="{{ url_for('main.motorcycle_detail', motorrad_id=motorcycle.id) }}">
+          <div class="motorcycle-card__image">
+            {% if motorcycle.bild %}
+              <img src="{{ url_for('main.uploaded_file', filename=motorcycle.bild) }}" alt="{{ motorcycle.marke }} {{ motorcycle.modell }}" loading="lazy" decoding="async">
+            {% else %}
+              <div class="motorcycle-card__placeholder">Kein Bild</div>
+            {% endif %}
+          </div>
+          <div class="motorcycle-card__body">
+            <div class="motorcycle-card__make">{{ motorcycle.marke }}</div>
+            <div class="motorcycle-card__model">{{ motorcycle.modell }}</div>
+          </div>
+        </a>
+      </article>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="empty-state">
+    <h2 class="h5">Noch kein Motorrad angelegt</h2>
+    <p class="text-secondary mb-3">Lege dein erstes Motorrad an und erfasse danach Services, Kosten und Belege.</p>
+    <a class="btn btn-primary" href="{{ url_for('main.motorcycle_new') }}">Motorrad anlegen</a>
+  </div>
+{% endif %}
+{% endblock %}

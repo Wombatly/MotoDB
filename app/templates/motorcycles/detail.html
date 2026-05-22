@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}{{ motorcycle.marke }} {{ motorcycle.modell }}{% endblock %}
+
+{% block content %}
+<div class="detail-hero mb-3">
+  {% if motorcycle.bild %}
+    <img src="{{ url_for('main.uploaded_file', filename=motorcycle.bild) }}" alt="{{ motorcycle.marke }} {{ motorcycle.modell }}" decoding="async">
+  {% else %}
+    <div class="detail-hero__placeholder">Kein Bild</div>
+  {% endif %}
+</div>
+
+<div class="d-flex align-items-start justify-content-between gap-3 mb-3">
+  <div>
+    <h1 class="h3 mb-1">{{ motorcycle.marke }} {{ motorcycle.modell }}</h1>
+    <p class="text-secondary mb-0">{{ motorcycle.baujahr or "Baujahr offen" }} · {{ motorcycle.kilometerstand|number }} km</p>
+  </div>
+</div>
+
+<div class="action-row mb-4">
+  <a class="btn btn-primary" href="{{ url_for('main.service_new', motorrad_id=motorcycle.id) }}">Service</a>
+  <button class="btn btn-outline-secondary" type="button" data-toggle-sheet>Datenblatt</button>
+  <a class="btn btn-outline-secondary" href="{{ url_for('main.motorcycle_edit', motorrad_id=motorcycle.id) }}">Bearbeiten</a>
+</div>
+
+<section class="mb-4" data-sheet hidden>
+  <div class="section-heading">
+    <div>
+      <h2 class="h5 mb-0">Datenblatt</h2>
+    </div>
+  </div>
+  {% if technical_specs %}
+    <form class="spec-groups" method="post" action="{{ url_for('main.motorcycle_data_sheet_update', motorrad_id=motorcycle.id) }}" data-autosave-sheet>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      {% for category, specs in technical_specs|groupby("kategorie") %}
+        <details class="spec-group" open>
+          <summary>{{ category or "Allgemein" }}</summary>
+          <div class="spec-list">
+            {% for spec in specs %}
+              <div class="spec-row">
+                <input type="hidden" name="kategorie" value="{{ spec.kategorie or 'Allgemein' }}">
+                <input type="hidden" name="name" value="{{ spec.name }}">
+                <span>{{ spec.name }}</span>
+                <div class="spec-row__value">
+                  <input class="spec-input spec-input--value" name="wert" value="{{ spec.wert or '' }}{% if spec.einheit %} {{ spec.einheit }}{% endif %}" aria-label="{{ spec.name }} Wert">
+                  <input type="hidden" name="einheit" value="">
+                </div>
+                <input type="hidden" name="quelle" value="">
+              </div>
+            {% endfor %}
+          </div>
+        </details>
+      {% endfor %}
+    </form>
+  {% else %}
+    <div class="empty-state">
+      <strong>Noch keine technischen Daten.</strong>
+      <span>Lege die Daten über das Menü unter „Technische Daten“ an oder lies eine CSV-Datei ein.</span>
+    </div>
+  {% endif %}
+</section>
+
+<section class="mb-4">
+  <h2 class="h5 mb-3">Service-Historie</h2>
+  {% if checklist_records %}
+    <div class="history-list">
+      {% for checklist in checklist_records %}
+        <a class="history-row" href="{{ url_for('main.checklist_edit', checklist_id=checklist.id) }}">
+          <span class="history-row__title">{{ checklist.titel }}</span>
+          <span>
+            {{ checklist.datum|date_de }}
+            {% if checklist.kilometerstand %} · {{ checklist.kilometerstand|number }} km{% endif %}
+            {% if checklist.intervall_km %} · {{ checklist.intervall_km|number }} km{% endif %}
+          </span>
+        </a>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="text-secondary">Noch keine Checkliste abgeschlossen.</p>
+  {% endif %}
+</section>
+{% endblock %}

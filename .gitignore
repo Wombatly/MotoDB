@@ -1,0 +1,13 @@
+.DS_Store
+
+# Local Python build/runtime artifacts
+__pycache__/
+*.py[cod]
+.pycache/
+.pytest_cache/
+.venv/
+
+# Local application configuration and runtime data
+.env
+instance/
+backups/

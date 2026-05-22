@@ -1,0 +1,17 @@
+services:
+  motorrad-service:
+    build: .
+    container_name: motorrad-service
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      MOTORRAD_INSTANCE_PATH: /data
+      MOTORRAD_UPLOAD_FOLDER: /data/uploads
+      DATABASE_URL: sqlite:////data/motorcycle_service.sqlite3
+      MOTODB_TRUST_PROXY_HEADERS: "true"
+    volumes:
+      - /srv/motorrad-service/data:/data
+    ports:
+      - "127.0.0.1:5001:5001"

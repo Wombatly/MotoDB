@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Technische Daten{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-start justify-content-between gap-3 mb-3">
+  <div>
+    <h1 class="h3 mb-1">Technische Daten</h1>
+    <p class="text-secondary mb-0">Technische Werte einem Motorrad zuordnen.</p>
+  </div>
+  {% if motorcycle %}
+    <a class="btn btn-outline-secondary" href="{{ url_for('main.motorcycle_detail', motorrad_id=motorcycle.id) }}">Zurück</a>
+  {% else %}
+    <a class="btn btn-outline-secondary" href="{{ url_for('main.index') }}">Zurück</a>
+  {% endif %}
+</div>
+
+<form method="post" enctype="multipart/form-data" class="form-panel">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <label class="form-label" for="motorrad_id">Motorrad</label>
+  <select class="form-select mb-3" id="motorrad_id" name="motorrad_id" data-technical-motorcycle-select required>
+    {% for option in motorcycles %}
+      <option value="{{ option.id }}" {% if motorcycle and option.id == motorcycle.id %}selected{% endif %}>{{ option.marke }} {{ option.modell }}</option>
+    {% endfor %}
+  </select>
+
+  <h2 class="h5 mb-3">Einlesen</h2>
+  <label class="form-label" for="csv_file">CSV-Datei einlesen</label>
+  <input class="form-control mb-3" id="csv_file" name="csv_file" type="file" accept=".csv,text/csv" required>
+
+  <div class="d-flex gap-2 mt-4">
+    <button class="btn btn-primary" type="submit">Speichern</button>
+    {% if motorcycle %}
+      <a class="btn btn-outline-secondary" href="{{ url_for('main.motorcycle_detail', motorrad_id=motorcycle.id) }}">Abbrechen</a>
+    {% else %}
+      <a class="btn btn-outline-secondary" href="{{ url_for('main.index') }}">Abbrechen</a>
+    {% endif %}
+  </div>
+</form>
+{% endblock %}
