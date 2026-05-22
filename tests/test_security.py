@@ -137,7 +137,43 @@ class SecurityTestCase(unittest.TestCase):
             self.assertEqual(response.status_code, 200)
             self.assertIn(b"Einstellungen", response.data)
             self.assertIn(b"Profil l", response.data)
+            self.assertIn(b"Service-Checklisten", response.data)
+            self.assertIn(b"Technische Daten", response.data)
             self.assertNotIn(b"Sicherungsort", response.data)
+
+    def test_admin_starts_in_garage_without_user_service_settings(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            app = self.build_app(tempdir)
+            with app.app_context():
+                admin = User.query.filter_by(is_admin=True).one()
+                user = User(username="rider", email="rider@example.com")
+                user.set_password("rider-password")
+                db.session.add(user)
+                db.session.flush()
+                db.session.add(Motorcycle(user_id=user.id, marke="Honda", modell="CB500"))
+                db.session.commit()
+                admin_id = admin.id
+
+            client = app.test_client()
+            with client.session_transaction() as session:
+                session["_user_id"] = str(admin_id)
+                session["_fresh"] = True
+
+            index_response = client.get("/")
+            users_response = client.get("/admin/users")
+            settings_response = client.get("/einstellungen")
+
+            self.assertEqual(index_response.status_code, 200)
+            self.assertIn(b"Motorr", index_response.data)
+            self.assertIn(b"Garage", index_response.data)
+            self.assertIn(b"CB500", index_response.data)
+            self.assertNotIn(b"Nutzerverwaltung</a>", index_response.data)
+            self.assertEqual(users_response.status_code, 200)
+            self.assertIn(b"Nutzerverwaltung", users_response.data)
+            self.assertIn(b"rider@example.com", users_response.data)
+            self.assertIn(b"Sicherungsort", settings_response.data)
+            self.assertNotIn(b"Service-Checklisten", settings_response.data)
+            self.assertNotIn(b"Technische Daten", settings_response.data)
 
     def test_profile_deletion_removes_user_data_and_uploads(self):
         with tempfile.TemporaryDirectory() as tempdir:

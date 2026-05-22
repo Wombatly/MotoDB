@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Nutzerverwaltung{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-start justify-content-between gap-3 mb-3">
+  <div>
+    <h1 class="h3 mb-1">Nutzerverwaltung</h1>
+    <p class="text-secondary mb-0">Konten und Admin-Rechte verwalten.</p>
+  </div>
+  <a class="btn btn-outline-secondary" href="{{ url_for('main.settings') }}">Einstellungen</a>
+</div>
+
+{% if users %}
+  <div class="user-list">
+    {% for user in users %}
+      <article class="user-row">
+        <div>
+          <h2 class="h5 mb-1">{{ user.username }}</h2>
+          <p class="text-secondary mb-0">{{ user.email }}</p>
+        </div>
+        <div class="user-row__meta">
+          <span>{{ "Admin" if user.is_admin else "Nutzer" }}</span>
+          <span>{{ user.motorcycles|length }} Motorräder</span>
+          <span>Letzter Login: {{ user.last_login|date_de }}</span>
+        </div>
+        {% if user.id == current_user.id %}
+          <span class="user-row__self">Aktuelles Konto</span>
+        {% else %}
+          <form method="post" action="{{ url_for('auth.toggle_admin', user_id=user.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn-outline-secondary" type="submit">
+              {% if user.is_admin %}Admin-Rechte entfernen{% else %}Zum Admin machen{% endif %}
+            </button>
+          </form>
+        {% endif %}
+      </article>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="empty-state">
+    <h2 class="h5 mb-0">Keine Nutzer gefunden</h2>
+  </div>
+{% endif %}
+{% endblock %}

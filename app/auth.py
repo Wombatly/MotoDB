@@ -292,7 +292,7 @@ def user_delete():
 @login_required
 @admin_required
 def admin_users():
-    users = User.query.all()
+    users = User.query.order_by(User.username, User.email).all()
     return render_template('admin/users.html', users=users)
 
 

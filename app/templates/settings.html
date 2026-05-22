@@ -19,6 +19,11 @@
 </section>
 
 {% if current_user.is_admin %}
+  <section class="form-panel mt-3">
+    <h2 class="h5 mb-3">Administration</h2>
+    <a class="btn btn-outline-secondary" href="{{ url_for('auth.admin_users') }}">Nutzerverwaltung</a>
+  </section>
+
   <form class="form-panel mt-3" method="post" action="{{ url_for('main.backup_path_update') }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <h2 class="h5 mb-3">Sicherungsort</h2>
@@ -29,8 +34,9 @@
     </div>
   </form>
 
+{% else %}
   <section class="form-panel mt-3">
-    <h2 class="h5 mb-3">Checklisten</h2>
+    <h2 class="h5 mb-3">Service-Checklisten</h2>
     <div class="d-flex gap-2">
       <a class="btn btn-outline-secondary" href="{{ url_for('main.checklist_new_global') }}">Checkliste anlegen</a>
       <a class="btn btn-outline-secondary" href="{{ url_for('main.checklist_csv_template') }}">Checklisten-Vorlage</a>
