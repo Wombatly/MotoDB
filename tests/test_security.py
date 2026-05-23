@@ -141,7 +141,7 @@ class SecurityTestCase(unittest.TestCase):
             self.assertIn(b"Technische Daten", response.data)
             self.assertNotIn(b"Sicherungsort", response.data)
 
-    def test_admin_starts_in_garage_without_user_service_settings(self):
+    def test_admin_starts_in_user_management_without_user_service_settings(self):
         with tempfile.TemporaryDirectory() as tempdir:
             app = self.build_app(tempdir)
             with app.app_context():
@@ -163,17 +163,60 @@ class SecurityTestCase(unittest.TestCase):
             users_response = client.get("/admin/users")
             settings_response = client.get("/einstellungen")
 
-            self.assertEqual(index_response.status_code, 200)
-            self.assertIn(b"Motorr", index_response.data)
-            self.assertIn(b"Garage", index_response.data)
-            self.assertIn(b"CB500", index_response.data)
-            self.assertNotIn(b"Nutzerverwaltung</a>", index_response.data)
+            self.assertEqual(index_response.status_code, 302)
+            self.assertEqual(index_response.headers["Location"], "/admin/users")
             self.assertEqual(users_response.status_code, 200)
-            self.assertIn(b"Nutzerverwaltung", users_response.data)
+            self.assertIn(b"Admin", users_response.data)
             self.assertIn(b"rider@example.com", users_response.data)
+            self.assertIn(b"1 Maschinen", users_response.data)
+            self.assertNotIn(b"Motorrad anlegen", users_response.data)
             self.assertIn(b"Sicherungsort", settings_response.data)
             self.assertNotIn(b"Service-Checklisten", settings_response.data)
             self.assertNotIn(b"Technische Daten", settings_response.data)
+
+    def test_admin_can_delete_user_data_and_uploads(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            app = self.build_app(tempdir)
+            app.config.update(WTF_CSRF_ENABLED=False)
+            with app.app_context():
+                admin = User.query.filter_by(is_admin=True).one()
+                user = User(username="rider", email="rider@example.com")
+                user.set_password("rider-password")
+                db.session.add(user)
+                db.session.flush()
+                motorcycle = Motorcycle(user_id=user.id, marke="Honda", modell="CB500")
+                db.session.add(motorcycle)
+                db.session.flush()
+                db.session.add(
+                    ServiceEntry(
+                        user_id=user.id,
+                        motorrad_id=motorcycle.id,
+                        datum=date(2026, 5, 22),
+                        kategorie="Wartung",
+                    )
+                )
+                db.session.commit()
+
+                admin_id = admin.id
+                user_id = user.id
+                upload_folder = Path(app.config["UPLOAD_FOLDER"]) / str(motorcycle.id)
+                upload_folder.mkdir(parents=True)
+                (upload_folder / "beleg.txt").write_text("delete", encoding="utf-8")
+
+            client = app.test_client()
+            with client.session_transaction() as session:
+                session["_user_id"] = str(admin_id)
+                session["_fresh"] = True
+
+            response = client.post(f"/admin/users/{user_id}/delete")
+
+            self.assertEqual(response.status_code, 302)
+            self.assertEqual(response.headers["Location"], "/admin/users")
+            self.assertFalse(upload_folder.exists())
+            with app.app_context():
+                self.assertIsNone(db.session.get(User, user_id))
+                self.assertEqual(Motorcycle.query.count(), 0)
+                self.assertEqual(ServiceEntry.query.count(), 0)
 
     def test_profile_deletion_removes_user_data_and_uploads(self):
         with tempfile.TemporaryDirectory() as tempdir:

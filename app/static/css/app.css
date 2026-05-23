@@ -713,6 +713,14 @@ a {
   gap: .45rem 1rem;
 }
 
+.user-row__actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+  justify-content: flex-start;
+}
+
 .user-row__self {
   color: #14532d;
   font-weight: 650;
@@ -999,6 +1007,11 @@ a {
   z-index: 25;
 }
 
+.bottom-nav--admin {
+  grid-template-columns: 1fr 1fr;
+  max-width: 420px;
+}
+
 .bottom-nav__item,
 .bottom-nav__fab {
   align-items: center;
@@ -1010,14 +1023,27 @@ a {
 
 .bottom-nav__item {
   flex-direction: column;
-  font-size: .72rem;
+  font-size: .78rem;
   gap: .15rem;
   min-width: 0;
 }
 
 .bottom-nav__icon {
-  font-size: 1.18rem;
+  height: 1.65rem;
   line-height: 1;
+  width: 1.65rem;
+}
+
+.bottom-nav__icon svg {
+  display: block;
+  height: 100%;
+  overflow: visible;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.1;
+  fill: none;
+  width: 100%;
 }
 
 .bottom-nav__fab {
@@ -1118,7 +1144,7 @@ a {
   }
 
   .bottom-nav__item {
-    font-size: .66rem;
+    font-size: .72rem;
   }
 }
 

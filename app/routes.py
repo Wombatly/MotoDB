@@ -6,6 +6,7 @@ from flask import (
     Blueprint,
     abort,
     current_app,
+    flash,
     jsonify,
     redirect,
     render_template,
@@ -79,9 +80,19 @@ def date_filter(value):
     return value.strftime("%d.%m.%Y")
 
 
+@bp.app_template_filter("datetime_de")
+def datetime_filter(value):
+    if not value:
+        return "-"
+    return value.strftime("%d.%m.%Y, %H:%M")
+
+
 @bp.route("/")
 @login_required
 def index():
+    if current_user.is_admin:
+        return redirect(url_for("auth.admin_users"))
+
     query = Motorcycle.query if current_user.is_admin else Motorcycle.query.filter_by(user_id=current_user.id)
     search = request.args.get("q", "").strip()
     sort = request.args.get("sort", "marke")
@@ -223,6 +234,10 @@ def technical_csv_template():
 @bp.route("/motorrad/neu", methods=["GET", "POST"])
 @login_required
 def motorcycle_new():
+    if current_user.is_admin:
+        flash("Admins verwalten Nutzerkonten. Motorräder legen Nutzer selbst an.", "info")
+        return redirect(url_for("auth.admin_users"))
+
     motorcycle = Motorcycle()
     if request.method == "POST":
         fill_motorcycle(motorcycle)

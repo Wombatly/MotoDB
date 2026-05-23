@@ -26,6 +26,20 @@ def admin_required(f):
     return decorated_function
 
 
+def delete_user_uploads(user):
+    upload_folder = Path(current_app.config['UPLOAD_FOLDER'])
+    motorcycle_ids = [
+        motorcycle_id
+        for (motorcycle_id,) in Motorcycle.query.with_entities(Motorcycle.id)
+        .filter_by(user_id=user.id)
+        .all()
+    ]
+    for motorcycle_id in motorcycle_ids:
+        motorcycle_upload_folder = upload_folder / str(motorcycle_id)
+        if motorcycle_upload_folder.exists():
+            shutil.rmtree(motorcycle_upload_folder)
+
+
 @auth_bp.route('/register', methods=['GET', 'POST'])
 def register():
     if not current_app.config["MOTODB_ALLOW_REGISTRATION"]:
@@ -265,19 +279,7 @@ def user_delete():
 
         user_id = current_user.id
 
-        motorcycle_ids = [
-            motorcycle_id
-            for (motorcycle_id,) in Motorcycle.query.with_entities(Motorcycle.id)
-            .filter_by(user_id=user_id)
-            .all()
-        ]
-
-        upload_folder = Path(current_app.config['UPLOAD_FOLDER'])
-        for motorcycle_id in motorcycle_ids:
-            motorcycle_upload_folder = upload_folder / str(motorcycle_id)
-            if motorcycle_upload_folder.exists():
-                shutil.rmtree(motorcycle_upload_folder)
-
+        delete_user_uploads(current_user)
         db.session.delete(current_user)
         db.session.commit()
 
@@ -293,7 +295,12 @@ def user_delete():
 @admin_required
 def admin_users():
     users = User.query.order_by(User.username, User.email).all()
-    return render_template('admin/users.html', users=users)
+    stats = {
+        "users": len(users),
+        "motorcycles": sum(len(user.motorcycles) for user in users),
+        "admins": sum(1 for user in users if user.is_admin),
+    }
+    return render_template('admin/users.html', users=users, stats=stats)
 
 
 @auth_bp.route('/admin/users/<int:user_id>/toggle-admin', methods=['POST'])
@@ -310,4 +317,26 @@ def toggle_admin(user_id):
 
     status = 'Admin' if user.is_admin else 'Nutzer'
     flash(f'{user.email} ist jetzt {status}.', 'success')
+    return redirect(url_for('auth.admin_users'))
+
+
+@auth_bp.route('/admin/users/<int:user_id>/delete', methods=['POST'])
+@login_required
+@admin_required
+def admin_delete_user(user_id):
+    if user_id == current_user.id:
+        flash('Du kannst dein eigenes Admin-Konto nicht löschen.', 'danger')
+        return redirect(url_for('auth.admin_users'))
+
+    user = User.query.get_or_404(user_id)
+    if user.is_admin and User.query.filter_by(is_admin=True).count() <= 1:
+        flash('Der letzte Admin kann nicht gelöscht werden.', 'danger')
+        return redirect(url_for('auth.admin_users'))
+
+    email = user.email
+    delete_user_uploads(user)
+    db.session.delete(user)
+    db.session.commit()
+
+    flash(f'{email} wurde mit allen zugehörigen Daten gelöscht.', 'success')
     return redirect(url_for('auth.admin_users'))

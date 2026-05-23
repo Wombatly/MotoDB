@@ -4,13 +4,28 @@
 {% block content %}
 <div class="d-flex align-items-start justify-content-between gap-3 mb-3">
   <div>
-    <h1 class="h3 mb-1">Nutzerverwaltung</h1>
-    <p class="text-secondary mb-0">Konten und Admin-Rechte verwalten.</p>
+    <h1 class="h3 mb-1">Admin</h1>
+    <p class="text-secondary mb-0">Nutzer, Rollen und Datenbestand verwalten.</p>
   </div>
   <a class="btn btn-outline-secondary" href="{{ url_for('main.settings') }}">Einstellungen</a>
 </div>
 
 {% if users %}
+  <section class="overview-strip mb-3" aria-label="Admin Übersicht">
+    <div>
+      <span>Nutzer</span>
+      <strong>{{ stats.users }}</strong>
+    </div>
+    <div>
+      <span>Maschinen</span>
+      <strong>{{ stats.motorcycles }}</strong>
+    </div>
+    <div>
+      <span>Admins</span>
+      <strong>{{ stats.admins }}</strong>
+    </div>
+  </section>
+
   <div class="user-list">
     {% for user in users %}
       <article class="user-row">
@@ -20,18 +35,25 @@
         </div>
         <div class="user-row__meta">
           <span>{{ "Admin" if user.is_admin else "Nutzer" }}</span>
-          <span>{{ user.motorcycles|length }} Motorräder</span>
-          <span>Letzter Login: {{ user.last_login|date_de }}</span>
+          <span>{{ user.motorcycles|length }} Maschinen</span>
+          <span>Letzter Login: {{ user.last_login|datetime_de }}</span>
+          <span>Angelegt: {{ user.created_at|date_de }}</span>
         </div>
         {% if user.id == current_user.id %}
           <span class="user-row__self">Aktuelles Konto</span>
         {% else %}
-          <form method="post" action="{{ url_for('auth.toggle_admin', user_id=user.id) }}">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button class="btn btn-outline-secondary" type="submit">
-              {% if user.is_admin %}Admin-Rechte entfernen{% else %}Zum Admin machen{% endif %}
-            </button>
-          </form>
+          <div class="user-row__actions">
+            <form method="post" action="{{ url_for('auth.toggle_admin', user_id=user.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-outline-secondary" type="submit">
+                {% if user.is_admin %}Admin entfernen{% else %}Zum Admin machen{% endif %}
+              </button>
+            </form>
+            <form method="post" action="{{ url_for('auth.admin_delete_user', user_id=user.id) }}" data-confirm="Diesen Nutzer mit allen Motorrädern, Services, Checklisten und Uploads wirklich löschen?">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-outline-danger" type="submit">Löschen</button>
+            </form>
+          </div>
         {% endif %}
       </article>
     {% endfor %}
