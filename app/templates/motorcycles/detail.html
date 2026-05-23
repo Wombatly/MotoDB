@@ -2,26 +2,43 @@
 {% block title %}{{ motorcycle.marke }} {{ motorcycle.modell }}{% endblock %}
 
 {% block content %}
-<div class="detail-hero mb-3">
-  {% if motorcycle.bild %}
-    <img src="{{ url_for('main.uploaded_file', filename=motorcycle.bild) }}" alt="{{ motorcycle.marke }} {{ motorcycle.modell }}" decoding="async">
-  {% else %}
-    <div class="detail-hero__placeholder">Kein Bild</div>
-  {% endif %}
-</div>
-
-<div class="d-flex align-items-start justify-content-between gap-3 mb-3">
-  <div>
-    <h1 class="h3 mb-1">{{ motorcycle.marke }} {{ motorcycle.modell }}</h1>
+<section class="detail-hero mb-3">
+  <div class="detail-hero__copy">
+    <p class="eyebrow mb-1">{{ motorcycle.marke }}</p>
+    <h1 class="h3 mb-1">{{ motorcycle.modell }}</h1>
     <p class="text-secondary mb-0">{{ motorcycle.baujahr or "Baujahr offen" }} · {{ motorcycle.kilometerstand|number }} km</p>
   </div>
-</div>
+  <div class="detail-hero__media">
+    {% if motorcycle.bild %}
+      <img src="{{ url_for('main.uploaded_file', filename=motorcycle.bild) }}" alt="{{ motorcycle.marke }} {{ motorcycle.modell }}" decoding="async" data-image-fallback>
+      <div class="detail-hero__placeholder" hidden>MotoDB</div>
+    {% else %}
+      <div class="detail-hero__placeholder">MotoDB</div>
+    {% endif %}
+  </div>
+</section>
 
 <div class="action-row mb-4">
   <a class="btn btn-primary" href="{{ url_for('main.service_new', motorrad_id=motorcycle.id) }}">Service</a>
+  <a class="btn btn-outline-secondary" href="{{ url_for('main.checklist_index', motorrad_id=motorcycle.id) }}">Aufgaben</a>
   <button class="btn btn-outline-secondary" type="button" data-toggle-sheet>Datenblatt</button>
   <a class="btn btn-outline-secondary" href="{{ url_for('main.motorcycle_edit', motorrad_id=motorcycle.id) }}">Bearbeiten</a>
 </div>
+
+<section class="overview-strip mb-4" aria-label="Motorrad Kennzahlen">
+  <div>
+    <span>Services</span>
+    <strong>{{ services|length }}</strong>
+  </div>
+  <div>
+    <span>Kosten</span>
+    <strong>{{ total_costs|number }} €</strong>
+  </div>
+  <div>
+    <span>Daten</span>
+    <strong>{{ technical_specs|length }}</strong>
+  </div>
+</section>
 
 <section class="mb-4" data-sheet hidden>
   <div class="section-heading">
@@ -61,6 +78,26 @@
 </section>
 
 <section class="mb-4">
+  <h2 class="h5 mb-3">Letzte Aktivität</h2>
+  {% if services %}
+    <div class="history-list mb-4">
+      {% for service in services[:5] %}
+        <a class="history-row" href="{{ url_for('main.service_edit', service_id=service.id) }}">
+          <span class="history-row__title">{{ service.titel or "Service" }}</span>
+          <span>
+            {{ service.datum|date_de }}
+            {% if service.kilometerstand %} · {{ service.kilometerstand|number }} km{% endif %}
+          </span>
+          {% if service.kosten %}
+            <strong>{{ service.kosten|number }} €</strong>
+          {% endif %}
+        </a>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="text-secondary">Noch kein Service eingetragen.</p>
+  {% endif %}
+
   <h2 class="h5 mb-3">Service-Historie</h2>
   {% if checklist_records %}
     <div class="history-list">

@@ -1,10 +1,15 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="container mt-5">
+<div class="auth-shell">
+    <div class="auth-brand">
+        <span class="brand-mark brand-mark--large">M</span>
+        <h1>Moto<span>DB</span></h1>
+        <p>Deine Maschine. Deine Story. Alles an einem Ort.</p>
+    </div>
     <div class="row justify-content-center">
         <div class="col-md-6">
-            <div class="card">
+            <div class="card auth-card">
                 <div class="card-body">
                     <h2 class="card-title text-center mb-4">Anmelden</h2>
                     {% if https_required %}

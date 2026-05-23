@@ -100,7 +100,16 @@ def index():
         query = query.order_by(Motorcycle.marke, Motorcycle.modell)
 
     motorcycles = query.all()
-    return render_template("motorcycles/index.html", motorcycles=motorcycles, search=search, sort=sort)
+    active_motorcycles = [motorcycle for motorcycle in motorcycles if motorcycle.aktiv]
+    garage_total_km = sum(motorcycle.kilometerstand or 0 for motorcycle in motorcycles)
+    return render_template(
+        "motorcycles/index.html",
+        motorcycles=motorcycles,
+        active_motorcycles=active_motorcycles,
+        garage_total_km=garage_total_km,
+        search=search,
+        sort=sort,
+    )
 
 
 @bp.route("/settings/backup-path", methods=["POST"])
@@ -242,6 +251,7 @@ def motorcycle_detail(motorrad_id):
     costs_by_category = {}
     for entry in services:
         costs_by_category[entry.kategorie] = costs_by_category.get(entry.kategorie, 0) + (entry.kosten or 0)
+    total_costs = sum(costs_by_category.values())
     technical_specs = (
         TechnicalSpec.query.filter_by(motorrad_id=motorrad_id, **owner_filter)
         .order_by(TechnicalSpec.kategorie, TechnicalSpec.name)
@@ -265,6 +275,7 @@ def motorcycle_detail(motorrad_id):
         motorcycle=motorcycle,
         services=services,
         costs_by_category=costs_by_category,
+        total_costs=total_costs,
         technical_specs=technical_specs,
         checklist_templates=checklist_templates,
         checklist_records=checklist_records,

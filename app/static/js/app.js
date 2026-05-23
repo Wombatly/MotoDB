@@ -72,6 +72,18 @@ document.querySelectorAll(".number-input").forEach((input) => {
   input.addEventListener("blur", () => normalizeNumberInput(input));
 });
 
+document.querySelectorAll("[data-image-fallback]").forEach((image) => {
+  const showFallback = () => {
+    image.hidden = true;
+    image.nextElementSibling?.removeAttribute("hidden");
+  };
+  if (image.complete && image.naturalWidth === 0) {
+    showFallback();
+  } else {
+    image.addEventListener("error", showFallback, { once: true });
+  }
+});
+
 document.querySelectorAll("form").forEach((form) => {
   form.addEventListener("submit", (event) => {
     const message = form.dataset.confirm;

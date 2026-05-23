@@ -3,16 +3,19 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#1f2937">
+    <meta name="theme-color" content="#f6efe7">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{% block title %}MotoDB{% endblock %}</title>
     <link rel="manifest" href="{{ url_for('main.manifest') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
   </head>
   <body>
-    <nav class="navbar navbar-expand bg-dark navbar-dark sticky-top">
+    <nav class="navbar sticky-top">
       <div class="container">
-        <a class="navbar-brand fw-semibold" href="{{ url_for('main.index') }}">MotoDB</a>
+        <a class="navbar-brand fw-semibold" href="{{ url_for('main.index') }}" aria-label="MotoDB Startseite">
+          <span class="brand-mark">M</span>
+          <span>Moto<span>DB</span></span>
+        </a>
         <div class="nav-menu">
           <button class="menu-toggle" type="button" data-menu-toggle aria-expanded="false" aria-label="Menü öffnen">
             <span></span>
@@ -43,7 +46,7 @@
       </div>
     </nav>
 
-    <main class="container py-3 py-md-4">
+    <main class="container app-main py-3 py-md-4">
       {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
           <div class="flash-list" role="status" aria-live="polite">
@@ -55,6 +58,28 @@
       {% endwith %}
       {% block content %}{% endblock %}
     </main>
+
+    {% if current_user.is_authenticated %}
+      <nav class="bottom-nav" aria-label="Hauptnavigation">
+        <a class="bottom-nav__item" href="{{ url_for('main.index') }}">
+          <span class="bottom-nav__icon" aria-hidden="true">⌂</span>
+          <span>Übersicht</span>
+        </a>
+        <a class="bottom-nav__item" href="{{ url_for('main.technical_data_global') }}">
+          <span class="bottom-nav__icon" aria-hidden="true">⚙</span>
+          <span>Technik</span>
+        </a>
+        <a class="bottom-nav__fab" href="{{ url_for('main.motorcycle_new') }}" aria-label="Motorrad anlegen">+</a>
+        <a class="bottom-nav__item" href="{{ url_for('main.checklist_new_global') }}">
+          <span class="bottom-nav__icon" aria-hidden="true">☑</span>
+          <span>Aufgaben</span>
+        </a>
+        <a class="bottom-nav__item" href="{{ url_for('main.settings') }}">
+          <span class="bottom-nav__icon" aria-hidden="true">○</span>
+          <span>Profil</span>
+        </a>
+      </nav>
+    {% endif %}
 
     <div class="toast-container">
       <div id="appToast" class="toast" role="status" aria-live="polite" aria-atomic="true">

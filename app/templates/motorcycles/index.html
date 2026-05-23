@@ -2,29 +2,49 @@
 {% block title %}Motorräder{% endblock %}
 
 {% block content %}
-<div class="d-flex align-items-center justify-content-between gap-3 mb-3">
+<div class="home-head d-flex align-items-center justify-content-between gap-3 mb-3">
   <div>
-    <h1 class="h3 mb-1">Motorräder</h1>
-    <p class="text-secondary mb-0">Deine Garage auf einen Blick.</p>
+    <p class="eyebrow mb-1">Garage</p>
+    <h1 class="h3 mb-1">Hallo, Biker</h1>
+    <p class="text-secondary mb-0">Deine Maschinen auf einen Blick.</p>
   </div>
-  <a class="btn btn-primary" href="{{ url_for('main.motorcycle_new') }}">Neu</a>
+  <a class="btn btn-primary btn-icon" href="{{ url_for('main.motorcycle_new') }}" aria-label="Motorrad anlegen">+</a>
 </div>
 
 {% if motorcycles %}
+  <section class="overview-strip mb-3" aria-label="Garage Übersicht">
+    <div>
+      <span>Maschinen</span>
+      <strong>{{ motorcycles|length }}</strong>
+    </div>
+    <div>
+      <span>Aktiv</span>
+      <strong>{{ active_motorcycles|length }}</strong>
+    </div>
+    <div>
+      <span>Gesamt km</span>
+      <strong>{{ garage_total_km|number }}</strong>
+    </div>
+  </section>
   <div class="motorcycle-grid">
     {% for motorcycle in motorcycles %}
       <article class="motorcycle-card">
         <a class="motorcycle-card__link" href="{{ url_for('main.motorcycle_detail', motorrad_id=motorcycle.id) }}">
-          <div class="motorcycle-card__image">
+          <div class="motorcycle-card__image" aria-hidden="true">
             {% if motorcycle.bild %}
-              <img src="{{ url_for('main.uploaded_file', filename=motorcycle.bild) }}" alt="{{ motorcycle.marke }} {{ motorcycle.modell }}" loading="lazy" decoding="async">
+              <img src="{{ url_for('main.uploaded_file', filename=motorcycle.bild) }}" alt="{{ motorcycle.marke }} {{ motorcycle.modell }}" loading="lazy" decoding="async" data-image-fallback>
+              <div class="motorcycle-card__placeholder" hidden>MotoDB</div>
             {% else %}
-              <div class="motorcycle-card__placeholder">Kein Bild</div>
+              <div class="motorcycle-card__placeholder">MotoDB</div>
             {% endif %}
           </div>
           <div class="motorcycle-card__body">
             <div class="motorcycle-card__make">{{ motorcycle.marke }}</div>
             <div class="motorcycle-card__model">{{ motorcycle.modell }}</div>
+            <div class="motorcycle-card__meta">
+              <span>{{ motorcycle.baujahr or "Baujahr offen" }}</span>
+              <span>{{ motorcycle.kilometerstand|number }} km</span>
+            </div>
           </div>
         </a>
       </article>

@@ -1,4 +1,4 @@
-const CACHE_NAME = "motodb-v25";
+const CACHE_NAME = "motodb-v27";
 const APP_SHELL = [
   "/static/css/app.css",
   "/static/js/app.js",
