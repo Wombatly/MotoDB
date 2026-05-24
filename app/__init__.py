@@ -43,11 +43,19 @@ def create_app():
     app.config["UPLOAD_FOLDER"] = Path(
         os.environ.get("MOTORRAD_UPLOAD_FOLDER", Path(app.instance_path) / "uploads")
     )
-    app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024
+    app.config["MAX_CONTENT_LENGTH"] = 64 * 1024 * 1024
     app.config["MOTODB_PUBLIC_HOSTING"] = public_hosting
     app.config["MOTODB_ALLOW_REGISTRATION"] = env_bool(
         "MOTODB_ALLOW_REGISTRATION",
         default=not public_hosting,
+    )
+    app.config["MOTODB_CONTROLLER_NAME"] = os.environ.get(
+        "MOTODB_CONTROLLER_NAME",
+        "Betreiber dieser MotoDB-Installation",
+    )
+    app.config["MOTODB_CONTROLLER_CONTACT"] = os.environ.get(
+        "MOTODB_CONTROLLER_CONTACT",
+        "ueber den Administrator dieser Installation",
     )
     app.config["SESSION_COOKIE_HTTPONLY"] = True
     app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
@@ -137,6 +145,19 @@ def security_policy():
 
 def ensure_schema_updates():
     with db.engine.connect() as connection:
+        connection.exec_driver_sql(
+            """
+            CREATE TABLE IF NOT EXISTS motorcycle_image (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                motorcycle_id INTEGER NOT NULL REFERENCES motorcycle(id),
+                path VARCHAR(255) NOT NULL,
+                original_name VARCHAR(255),
+                position INTEGER NOT NULL DEFAULT 0,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+
         admin_id = connection.exec_driver_sql(
             "SELECT id FROM user WHERE is_admin = 1 ORDER BY id LIMIT 1"
         ).scalar()
@@ -181,6 +202,40 @@ def ensure_schema_updates():
             connection.exec_driver_sql(
                 "ALTER TABLE service_checklist_item ADD COLUMN kommentar_vorlage TEXT"
             )
+
+        connection.exec_driver_sql(
+            """
+            INSERT INTO motorcycle_image (motorcycle_id, path, original_name, position, created_at)
+            SELECT motorcycle.id, motorcycle.bild, NULL, 0, COALESCE(motorcycle.updated_at, motorcycle.created_at, CURRENT_TIMESTAMP)
+            FROM motorcycle
+            WHERE motorcycle.bild IS NOT NULL
+              AND motorcycle.bild != ''
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM motorcycle_image
+                  WHERE motorcycle_image.motorcycle_id = motorcycle.id
+                    AND motorcycle_image.path = motorcycle.bild
+              )
+            """
+        )
+        connection.exec_driver_sql(
+            """
+            UPDATE motorcycle
+            SET bild = (
+                SELECT motorcycle_image.path
+                FROM motorcycle_image
+                WHERE motorcycle_image.motorcycle_id = motorcycle.id
+                ORDER BY motorcycle_image.position, motorcycle_image.id
+                LIMIT 1
+            )
+            WHERE (motorcycle.bild IS NULL OR motorcycle.bild = '')
+              AND EXISTS (
+                  SELECT 1
+                  FROM motorcycle_image
+                  WHERE motorcycle_image.motorcycle_id = motorcycle.id
+              )
+            """
+        )
         connection.commit()
 
 

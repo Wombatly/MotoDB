@@ -4,20 +4,76 @@
 {% block content %}
 <div class="d-flex align-items-center justify-content-between gap-3 mb-3">
   <h1 class="h3 mb-0">{{ title }}</h1>
-  <a class="btn btn-outline-secondary" href="{{ url_for('main.index') }}">Zurück</a>
 </div>
+
+{% if gallery_images %}
+  <section class="form-panel mb-3">
+    <h2 class="h5 mb-3">Bilderverwaltung</h2>
+    <div class="image-manager" data-image-manager>
+      <div class="image-manager__viewport{% if gallery_images|length == 1 %} image-manager__viewport--single{% endif %}">
+        {% if gallery_images|length > 1 %}
+          <button class="image-manager__nav btn btn-outline-secondary btn-icon" type="button" data-image-manager-prev aria-label="Vorheriges Bild">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M15 18l-6-6 6-6"></path>
+            </svg>
+          </button>
+        {% endif %}
+        <div class="image-manager__track">
+          {% for image in gallery_images %}
+            <article class="image-manager__slide{% if loop.first %} is-active{% endif %}" data-image-manager-slide {% if not loop.first %}hidden{% endif %}>
+              <div class="edit-image-preview">
+                <img src="{{ url_for('main.uploaded_file', filename=image.path) }}" alt="{{ motorcycle.marke }} {{ motorcycle.modell }} Bild {{ loop.index }}">
+                <span class="image-manager__badge{% if image.path == motorcycle.bild %} is-primary{% endif %}">
+                  {{ "Titelbild" if image.path == motorcycle.bild else "Galerie" }}
+                </span>
+              </div>
+              <div class="image-manager__actions">
+                {% if image.path == motorcycle.bild %}
+                  <span class="image-manager__primary-indicator" aria-label="Aktuelles Titelbild">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M20 6L9 17l-5-5"></path>
+                    </svg>
+                    Titelbild
+                  </span>
+                {% else %}
+                  <button class="btn btn-outline-secondary image-manager__primary-button" type="submit" form="make-primary-image-{{ image.id }}">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M20 6L9 17l-5-5"></path>
+                    </svg>
+                    Als Titelbild
+                  </button>
+                {% endif %}
+                <button class="btn btn-outline-danger btn-icon" type="submit" form="delete-gallery-image-{{ image.id }}" aria-label="Bild löschen" title="Bild löschen">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M3 6h18"></path>
+                    <path d="M8 6V4h8v2"></path>
+                    <path d="M19 6l-1 14H6L5 6"></path>
+                    <path d="M10 11v5"></path>
+                    <path d="M14 11v5"></path>
+                  </svg>
+                </button>
+              </div>
+            </article>
+          {% endfor %}
+        </div>
+        {% if gallery_images|length > 1 %}
+          <button class="image-manager__nav btn btn-outline-secondary btn-icon" type="button" data-image-manager-next aria-label="Nächstes Bild">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M9 18l6-6-6-6"></path>
+            </svg>
+          </button>
+        {% endif %}
+      </div>
+      {% if gallery_images|length > 1 %}
+        <p class="image-manager__counter mb-0"><span data-image-manager-current>1</span> / {{ gallery_images|length }}</p>
+      {% endif %}
+    </div>
+  </section>
+{% endif %}
 
 <form method="post" enctype="multipart/form-data" class="form-panel">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <div class="row g-3">
-    {% if motorcycle.id and motorcycle.bild %}
-      <div class="col-12">
-        <div class="edit-image-preview">
-          <img src="{{ url_for('main.uploaded_file', filename=motorcycle.bild) }}" alt="{{ motorcycle.marke }} {{ motorcycle.modell }}">
-          <button class="image-delete-button" type="submit" form="delete-image-form" aria-label="Bild löschen">×</button>
-        </div>
-      </div>
-    {% endif %}
     <div class="col-12 col-md-6">
       <label class="form-label" for="marke">Marke</label>
       <input class="form-control" id="marke" name="marke" value="{{ motorcycle.marke or '' }}" required>
@@ -70,19 +126,14 @@
       <label class="form-label" for="verkaufspreis">Verkaufspreis</label>
       <input class="form-control number-input" id="verkaufspreis" name="verkaufspreis" inputmode="numeric" value="{{ motorcycle.verkaufspreis or '' }}">
     </div>
-    <div class="col-12 col-md-4 d-flex align-items-end">
-      <div class="form-check mb-2">
-        <input class="form-check-input" id="aktiv" name="aktiv" type="checkbox" {% if motorcycle.aktiv or motorcycle.id is none %}checked{% endif %}>
-        <label class="form-check-label" for="aktiv">Aktiv</label>
-      </div>
-    </div>
     <div class="col-12">
       <label class="form-label" for="notizen">Notizen</label>
       <textarea class="form-control" id="notizen" name="notizen" rows="4">{{ motorcycle.notizen or '' }}</textarea>
     </div>
     <div class="col-12">
-      <label class="form-label" for="bild">Bild</label>
-      <input class="form-control" id="bild" name="bild" type="file" accept="image/*">
+      <label class="form-label" for="bilder">Bilder</label>
+      <input class="form-control" id="bilder" name="bilder" type="file" accept="image/*" multiple>
+      <p class="text-secondary mb-0 mt-2">Mehrere Bilder auf einmal sind möglich.</p>
     </div>
   </div>
 
@@ -95,20 +146,33 @@
     </div>
     {% if motorcycle.id %}
       <div class="d-flex gap-2">
-        <button class="btn btn-outline-danger" type="submit" form="delete-motorcycle-form">Motorrad löschen</button>
+        <button class="btn btn-outline-danger btn-icon" type="submit" form="delete-motorcycle-form" aria-label="Motorrad löschen" title="Motorrad löschen">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M3 6h18"></path>
+            <path d="M8 6V4h8v2"></path>
+            <path d="M19 6l-1 14H6L5 6"></path>
+            <path d="M10 11v5"></path>
+            <path d="M14 11v5"></path>
+          </svg>
+        </button>
       </div>
     {% endif %}
   </div>
 </form>
 
-{% if motorcycle.id and motorcycle.bild %}
-  <form method="post" action="{{ url_for('main.motorcycle_image_delete', motorrad_id=motorcycle.id) }}" id="delete-image-form">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-  </form>
-{% endif %}
 {% if motorcycle.id %}
   <form method="post" action="{{ url_for('main.motorcycle_delete', motorrad_id=motorcycle.id) }}" id="delete-motorcycle-form" data-confirm="Dieses Motorrad wirklich löschen?">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   </form>
 {% endif %}
+{% for image in gallery_images %}
+  {% if image.path != motorcycle.bild %}
+    <form method="post" action="{{ url_for('main.motorcycle_gallery_image_make_primary', motorrad_id=motorcycle.id, image_id=image.id) }}" id="make-primary-image-{{ image.id }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    </form>
+  {% endif %}
+  <form method="post" action="{{ url_for('main.motorcycle_gallery_image_delete', motorrad_id=motorcycle.id, image_id=image.id) }}" id="delete-gallery-image-{{ image.id }}" data-confirm="Dieses Bild wirklich löschen?">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  </form>
+{% endfor %}
 {% endblock %}

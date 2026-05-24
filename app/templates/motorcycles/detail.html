@@ -3,15 +3,23 @@
 
 {% block content %}
 <section class="detail-hero mb-3">
+  <a class="detail-hero__edit btn btn-outline-secondary btn-icon" href="{{ url_for('main.motorcycle_edit', motorrad_id=motorcycle.id) }}" aria-label="Bearbeiten" title="Bearbeiten">
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="3"></circle>
+      <path d="M19.4 12.9a1.7 1.7 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.82-.33 1.7 1.7 0 0 0-1.03 1.56V19a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1.03-1.56 1.7 1.7 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .33-1.82 1.7 1.7 0 0 0-1.56-1.03H5a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 6.65 5.97a1.7 1.7 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.82.33h.01A1.7 1.7 0 0 0 12 1h.09a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.33 1.82v.01A1.7 1.7 0 0 0 23 8h.09a2 2 0 1 1 0 4H23a1.7 1.7 0 0 0-1.56 1.03z"></path>
+    </svg>
+  </a>
   <div class="detail-hero__copy">
     <p class="eyebrow mb-1">{{ motorcycle.marke }}</p>
     <h1 class="h3 mb-1">{{ motorcycle.modell }}</h1>
     <p class="text-secondary mb-0">{{ motorcycle.baujahr or "Baujahr offen" }} · {{ motorcycle.kilometerstand|number }} km</p>
   </div>
   <div class="detail-hero__media">
-    {% if motorcycle.bild %}
-      <img src="{{ url_for('main.uploaded_file', filename=motorcycle.bild) }}" alt="{{ motorcycle.marke }} {{ motorcycle.modell }}" decoding="async" data-image-fallback>
-      <div class="detail-hero__placeholder" hidden>MotoDB</div>
+    {% if primary_image %}
+      <button class="detail-hero__image-button" type="button" data-gallery-open data-gallery-index="0" aria-label="Bilder vergrößern">
+        <img src="{{ url_for('main.uploaded_file', filename=primary_image.path) }}" alt="{{ motorcycle.marke }} {{ motorcycle.modell }}" decoding="async" data-image-fallback>
+        <div class="detail-hero__placeholder" hidden>MotoDB</div>
+      </button>
     {% else %}
       <div class="detail-hero__placeholder">MotoDB</div>
     {% endif %}
@@ -20,9 +28,8 @@
 
 <div class="action-row mb-4">
   <a class="btn btn-primary" href="{{ url_for('main.service_new', motorrad_id=motorcycle.id) }}">Service</a>
-  <a class="btn btn-outline-secondary" href="{{ url_for('main.checklist_index', motorrad_id=motorcycle.id) }}">Aufgaben</a>
+  <a class="btn btn-outline-secondary" href="{{ url_for('main.checklist_index', motorrad_id=motorcycle.id) }}">Service</a>
   <button class="btn btn-outline-secondary" type="button" data-toggle-sheet>Datenblatt</button>
-  <a class="btn btn-outline-secondary" href="{{ url_for('main.motorcycle_edit', motorrad_id=motorcycle.id) }}">Bearbeiten</a>
 </div>
 
 <section class="overview-strip mb-4" aria-label="Motorrad Kennzahlen">
@@ -50,7 +57,7 @@
     <form class="spec-groups" method="post" action="{{ url_for('main.motorcycle_data_sheet_update', motorrad_id=motorcycle.id) }}" data-autosave-sheet>
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       {% for category, specs in technical_specs|groupby("kategorie") %}
-        <details class="spec-group" open>
+        <details class="spec-group">
           <summary>{{ category or "Allgemein" }}</summary>
           <div class="spec-list">
             {% for spec in specs %}
@@ -116,4 +123,51 @@
     <p class="text-secondary">Noch keine Checkliste abgeschlossen.</p>
   {% endif %}
 </section>
+
+{% if gallery_images %}
+  <section class="gallery-viewer" data-gallery hidden aria-hidden="true">
+    <div class="gallery-viewer__backdrop" data-gallery-close></div>
+    <div class="gallery-viewer__dialog" role="dialog" aria-modal="true" aria-label="Motorradbilder">
+      <button class="gallery-viewer__close btn btn-outline-secondary btn-icon" type="button" data-gallery-close aria-label="Bilder schließen">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M6 6l12 12"></path>
+          <path d="M18 6L6 18"></path>
+        </svg>
+      </button>
+      <div class="gallery-viewer__stage{% if gallery_images|length == 1 %} gallery-viewer__stage--single{% endif %}">
+        {% if gallery_images|length > 1 %}
+          <button class="gallery-viewer__nav gallery-viewer__nav--prev btn btn-outline-secondary btn-icon" type="button" data-gallery-prev aria-label="Vorheriges Bild">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M15 18l-6-6 6-6"></path>
+            </svg>
+          </button>
+        {% endif %}
+        {% for image in gallery_images %}
+          <figure class="gallery-viewer__slide{% if loop.first %} is-active{% endif %}" data-gallery-slide {% if not loop.first %}hidden{% endif %}>
+            <img src="{{ url_for('main.uploaded_file', filename=image.path) }}" alt="{{ motorcycle.marke }} {{ motorcycle.modell }} Bild {{ loop.index }}">
+          </figure>
+        {% endfor %}
+        {% if gallery_images|length > 1 %}
+          <button class="gallery-viewer__nav gallery-viewer__nav--next btn btn-outline-secondary btn-icon" type="button" data-gallery-next aria-label="Nächstes Bild">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M9 18l6-6-6-6"></path>
+            </svg>
+          </button>
+        {% endif %}
+      </div>
+      {% if gallery_images|length > 1 %}
+        <div class="gallery-viewer__footer">
+          <div class="gallery-viewer__thumbs">
+            {% for image in gallery_images %}
+              <button class="gallery-viewer__thumb{% if loop.first %} is-active{% endif %}" type="button" data-gallery-thumb="{{ loop.index0 }}" aria-label="Bild {{ loop.index }} anzeigen">
+                <img src="{{ url_for('main.uploaded_file', filename=image.path) }}" alt="">
+              </button>
+            {% endfor %}
+          </div>
+          <p class="gallery-viewer__counter"><span data-gallery-current>1</span> / {{ gallery_images|length }}</p>
+        </div>
+      {% endif %}
+    </div>
+  </section>
+{% endif %}
 {% endblock %}

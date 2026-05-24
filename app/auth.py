@@ -11,7 +11,7 @@ from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.utils import secure_filename
 
 from app import db
-from app.models import User, Motorcycle, ServiceEntry, TechnicalSpec, ServiceChecklist
+from app.models import User, Motorcycle, MotorcycleImage, ServiceEntry, TechnicalSpec, ServiceChecklist
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -38,6 +38,28 @@ def delete_user_uploads(user):
         motorcycle_upload_folder = upload_folder / str(motorcycle_id)
         if motorcycle_upload_folder.exists():
             shutil.rmtree(motorcycle_upload_folder)
+
+
+def export_folder_name(motorcycle, used_names):
+    base_name = secure_filename(f"{motorcycle.marke}_{motorcycle.modell}").strip("_") or f"motorrad_{motorcycle.id}"
+    folder_name = base_name
+    suffix = 2
+    while folder_name in used_names:
+        folder_name = f"{base_name}_{suffix}"
+        suffix += 1
+    used_names.add(folder_name)
+    return folder_name
+
+
+def write_export_file(zf, upload_root, relative_path, target_prefix):
+    if not relative_path:
+        return None
+    file_path = upload_root / relative_path
+    if not file_path.exists() or not file_path.is_file():
+        return None
+    archive_name = Path(target_prefix) / file_path.name
+    zf.write(file_path, archive_name.as_posix())
+    return archive_name.as_posix()
 
 
 @auth_bp.route('/register', methods=['GET', 'POST'])
@@ -150,121 +172,199 @@ def change_password():
     return render_template('auth/change_password.html')
 
 
-@auth_bp.route('/consent', methods=['POST'])
-@login_required
-def accept_consent():
-    current_user.consent_accepted_at = datetime.utcnow()
-    db.session.commit()
-    return redirect(request.referrer or url_for('main.index'))
-
-
 @auth_bp.route('/user/export')
 @login_required
 def user_export():
-    export_data = {
-        'user': {
-            'email': current_user.email,
-            'username': current_user.username,
-            'created_at': current_user.created_at.isoformat(),
-        },
-        'motorcycles': [],
-        'services': [],
-        'technical_specs': [],
-        'checklists': [],
+    motorcycles = Motorcycle.query.filter_by(user_id=current_user.id).order_by(Motorcycle.marke, Motorcycle.modell).all()
+    upload_root = Path(current_app.config['UPLOAD_FOLDER'])
+    used_names = set()
+    folder_names = {
+        motorcycle.id: export_folder_name(motorcycle, used_names)
+        for motorcycle in motorcycles
     }
-
-    motorcycles = Motorcycle.query.filter_by(user_id=current_user.id).all()
-    for m in motorcycles:
-        export_data['motorcycles'].append({
-            'id': m.id,
-            'marke': m.marke,
-            'modell': m.modell,
-            'baujahr': m.baujahr,
-            'kilometerstand': m.kilometerstand,
-            'kaufpreis': m.kaufpreis,
-            'hubraum': m.hubraum,
-            'ps': m.ps,
-            'farbe': m.farbe,
-            'kaufdatum': m.kaufdatum.isoformat() if m.kaufdatum else None,
-            'kennzeichen': m.kennzeichen,
-            'vin': m.vin,
-            'erstzulassung': m.erstzulassung.isoformat() if m.erstzulassung else None,
-            'verkauft_am': m.verkauft_am.isoformat() if m.verkauft_am else None,
-            'verkaufspreis': m.verkaufspreis,
-            'aktiv': m.aktiv,
-            'notizen': m.notizen,
-            'created_at': m.created_at.isoformat(),
-            'updated_at': m.updated_at.isoformat(),
-        })
-
-    services = ServiceEntry.query.filter_by(user_id=current_user.id).all()
-    for s in services:
-        export_data['services'].append({
-            'id': s.id,
-            'motorrad_id': s.motorrad_id,
-            'titel': s.titel,
-            'datum': s.datum.isoformat() if s.datum else None,
-            'kilometerstand': s.kilometerstand,
-            'beschreibung': s.beschreibung,
-            'kosten': s.kosten,
-            'kategorie': s.kategorie,
-            'naechster_service_km': s.naechster_service_km,
-            'naechster_service_datum': s.naechster_service_datum.isoformat() if s.naechster_service_datum else None,
-            'created_at': s.created_at.isoformat(),
-            'updated_at': s.updated_at.isoformat(),
-        })
-
-    specs = TechnicalSpec.query.filter_by(user_id=current_user.id).all()
-    for spec in specs:
-        export_data['technical_specs'].append({
-            'id': spec.id,
-            'motorrad_id': spec.motorrad_id,
-            'name': spec.name,
-            'wert': spec.wert,
-            'einheit': spec.einheit,
-            'kategorie': spec.kategorie,
-            'quelle': spec.quelle,
-            'created_at': spec.created_at.isoformat(),
-            'updated_at': spec.updated_at.isoformat(),
-        })
-
-    checklists = ServiceChecklist.query.filter_by(user_id=current_user.id).all()
-    for cl in checklists:
-        export_data['checklists'].append({
-            'id': cl.id,
-            'motorrad_id': cl.motorrad_id,
-            'titel': cl.titel,
-            'intervall_km': cl.intervall_km,
-            'intervall_monate': cl.intervall_monate,
-            'datum': cl.datum.isoformat() if cl.datum else None,
-            'kilometerstand': cl.kilometerstand,
-            'anmerkungen': cl.anmerkungen,
-            'is_template': cl.is_template,
-            'completed_at': cl.completed_at.isoformat() if cl.completed_at else None,
-            'created_at': cl.created_at.isoformat(),
-            'updated_at': cl.updated_at.isoformat(),
-        })
-
     zip_buffer = BytesIO()
     with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
-        zf.writestr('data.json', json.dumps(export_data, indent=2, ensure_ascii=False))
+        zf.writestr(
+            'profil.json',
+            json.dumps(
+                {
+                    'user': {
+                        'id': current_user.id,
+                        'email': current_user.email,
+                        'username': current_user.username,
+                        'created_at': current_user.created_at.isoformat(),
+                    },
+                    'motorcycles': [
+                        {
+                            'id': motorcycle.id,
+                            'ordner': folder_names[motorcycle.id],
+                            'marke': motorcycle.marke,
+                            'modell': motorcycle.modell,
+                        }
+                        for motorcycle in motorcycles
+                    ],
+                },
+                indent=2,
+                ensure_ascii=False,
+            ),
+        )
 
-        upload_folder = Path(current_app.config['UPLOAD_FOLDER'])
         for motorcycle in motorcycles:
-            motorcycle_upload_folder = upload_folder / str(motorcycle.id)
-            if motorcycle_upload_folder.exists():
-                for file_path in motorcycle_upload_folder.rglob('*'):
-                    if file_path.is_file():
-                        arcname = file_path.relative_to(upload_folder)
-                        zf.write(file_path, arcname)
+            folder_name = folder_names[motorcycle.id]
+            folder_path = Path(folder_name)
+
+            gallery_images = list(
+                MotorcycleImage.query.filter_by(motorcycle_id=motorcycle.id)
+                .order_by(MotorcycleImage.position, MotorcycleImage.id)
+                .all()
+            )
+            if not gallery_images and motorcycle.bild:
+                gallery_images = [MotorcycleImage(path=motorcycle.bild, position=0)]
+
+            image_entries = []
+            for index, image in enumerate(gallery_images, start=1):
+                archive_path = write_export_file(
+                    zf,
+                    upload_root,
+                    image.path,
+                    folder_path / 'bilder',
+                )
+                image_entries.append(
+                    {
+                        'index': index,
+                        'path': image.path,
+                        'original_name': image.original_name,
+                        'ist_titelbild': image.path == motorcycle.bild,
+                        'datei': archive_path,
+                    }
+                )
+
+            service_entries = []
+            services = (
+                ServiceEntry.query.filter_by(user_id=current_user.id, motorrad_id=motorcycle.id)
+                .order_by(ServiceEntry.datum.desc(), ServiceEntry.id.desc())
+                .all()
+            )
+            for service in services:
+                receipt_archive = write_export_file(
+                    zf,
+                    upload_root,
+                    service.beleg,
+                    folder_path / 'belege',
+                )
+                service_entries.append(
+                    {
+                        'id': service.id,
+                        'titel': service.titel,
+                        'datum': service.datum.isoformat() if service.datum else None,
+                        'kilometerstand': service.kilometerstand,
+                        'beschreibung': service.beschreibung,
+                        'kosten': service.kosten,
+                        'kategorie': service.kategorie,
+                        'naechster_service_km': service.naechster_service_km,
+                        'naechster_service_datum': service.naechster_service_datum.isoformat() if service.naechster_service_datum else None,
+                        'beleg_originalname': service.beleg_originalname,
+                        'beleg_datei': receipt_archive,
+                        'created_at': service.created_at.isoformat(),
+                        'updated_at': service.updated_at.isoformat(),
+                    }
+                )
+
+            specs = (
+                TechnicalSpec.query.filter_by(user_id=current_user.id, motorrad_id=motorcycle.id)
+                .order_by(TechnicalSpec.kategorie, TechnicalSpec.name)
+                .all()
+            )
+            spec_entries = [
+                {
+                    'id': spec.id,
+                    'name': spec.name,
+                    'wert': spec.wert,
+                    'einheit': spec.einheit,
+                    'kategorie': spec.kategorie,
+                    'quelle': spec.quelle,
+                    'created_at': spec.created_at.isoformat(),
+                    'updated_at': spec.updated_at.isoformat(),
+                }
+                for spec in specs
+            ]
+
+            checklists = (
+                ServiceChecklist.query.filter_by(user_id=current_user.id, motorrad_id=motorcycle.id)
+                .order_by(ServiceChecklist.created_at, ServiceChecklist.id)
+                .all()
+            )
+            checklist_entries = []
+            for checklist in checklists:
+                checklist_entries.append(
+                    {
+                        'id': checklist.id,
+                        'titel': checklist.titel,
+                        'intervall_km': checklist.intervall_km,
+                        'intervall_monate': checklist.intervall_monate,
+                        'datum': checklist.datum.isoformat() if checklist.datum else None,
+                        'kilometerstand': checklist.kilometerstand,
+                        'anmerkungen': checklist.anmerkungen,
+                        'is_template': checklist.is_template,
+                        'source_template_id': checklist.source_template_id,
+                        'completed_at': checklist.completed_at.isoformat() if checklist.completed_at else None,
+                        'created_at': checklist.created_at.isoformat(),
+                        'updated_at': checklist.updated_at.isoformat(),
+                        'items': [
+                            {
+                                'id': item.id,
+                                'position': item.position,
+                                'text': item.text,
+                                'kommentar_vorlage': item.kommentar_vorlage,
+                                'erledigt': item.erledigt,
+                                'anmerkung': item.anmerkung,
+                                'updated_at': item.updated_at.isoformat(),
+                            }
+                            for item in checklist.items
+                        ],
+                    }
+                )
+
+            motorcycle_data = {
+                'motorrad': {
+                    'id': motorcycle.id,
+                    'marke': motorcycle.marke,
+                    'modell': motorcycle.modell,
+                    'baujahr': motorcycle.baujahr,
+                    'kilometerstand': motorcycle.kilometerstand,
+                    'kaufpreis': motorcycle.kaufpreis,
+                    'hubraum': motorcycle.hubraum,
+                    'ps': motorcycle.ps,
+                    'farbe': motorcycle.farbe,
+                    'kaufdatum': motorcycle.kaufdatum.isoformat() if motorcycle.kaufdatum else None,
+                    'kennzeichen': motorcycle.kennzeichen,
+                    'vin': motorcycle.vin,
+                    'erstzulassung': motorcycle.erstzulassung.isoformat() if motorcycle.erstzulassung else None,
+                    'verkauft_am': motorcycle.verkauft_am.isoformat() if motorcycle.verkauft_am else None,
+                    'verkaufspreis': motorcycle.verkaufspreis,
+                    'aktiv': motorcycle.aktiv,
+                    'notizen': motorcycle.notizen,
+                    'titelbild': motorcycle.bild,
+                    'created_at': motorcycle.created_at.isoformat(),
+                    'updated_at': motorcycle.updated_at.isoformat(),
+                },
+                'bilder': image_entries,
+                'services': service_entries,
+                'technische_daten': spec_entries,
+                'checklisten': checklist_entries,
+            }
+
+            zf.writestr(
+                (folder_path / 'daten.json').as_posix(),
+                json.dumps(motorcycle_data, indent=2, ensure_ascii=False),
+            )
 
     zip_buffer.seek(0)
-    timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
     return send_file(
         zip_buffer,
         mimetype='application/zip',
         as_attachment=True,
-        download_name=f'motorad_export_{current_user.id}_{timestamp}.zip'
+        download_name='meineGarage.zip'
     )
 
 
@@ -300,7 +400,22 @@ def admin_users():
         "motorcycles": sum(len(user.motorcycles) for user in users),
         "admins": sum(1 for user in users if user.is_admin),
     }
-    return render_template('admin/users.html', users=users, stats=stats)
+    disk_usage = None
+    try:
+        usage = shutil.disk_usage(current_app.instance_path)
+        percent_used = round((usage.used / usage.total) * 100) if usage.total else 0
+        disk_usage = {
+            "path": current_app.instance_path,
+            "total": usage.total,
+            "used": usage.used,
+            "free": usage.free,
+            "percent_used": min(percent_used, 100),
+            "percent_free": max(100 - percent_used, 0),
+        }
+    except OSError:
+        disk_usage = None
+
+    return render_template('admin/users.html', users=users, stats=stats, disk_usage=disk_usage)
 
 
 @auth_bp.route('/admin/users/<int:user_id>/toggle-admin', methods=['POST'])

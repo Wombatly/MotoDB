@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Datenschutz{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-start justify-content-between gap-3 mb-3">
+  <div>
+    <h1 class="h3 mb-1">Datenschutz</h1>
+    <p class="text-secondary mb-0">Welche Daten MotoDB verarbeitet und welche Kontrolle du hast.</p>
+  </div>
+</div>
+
+<section class="form-panel mt-3">
+  <h2 class="h5 mb-3">Verantwortlicher</h2>
+  <p class="text-secondary mb-0">
+    Verantwortlich ist {{ config.MOTODB_CONTROLLER_NAME }}.
+    Kontakt: {{ config.MOTODB_CONTROLLER_CONTACT }}.
+  </p>
+</section>
+
+<section class="form-panel mt-3">
+  <h2 class="h5 mb-3">Verarbeitete Daten</h2>
+  <p class="text-secondary mb-0">
+    MotoDB speichert Kontoangaben wie Benutzername, E-Mail-Adresse, Passwort-Hash und Login-Zeitpunkt.
+    Dazu kommen die von dir angelegten Motorräder, Services, technische Daten, Checklisten, Bilder,
+    Belege und Notizen.
+  </p>
+</section>
+
+<section class="form-panel mt-3">
+  <h2 class="h5 mb-3">Zweck</h2>
+  <p class="text-secondary mb-0">
+    Die Daten werden verwendet, um deine Garage, Wartungshistorie, Bilder, Belege und Exporte in der
+    App bereitzustellen. Es findet kein Tracking zu Werbezwecken statt.
+  </p>
+</section>
+
+<section class="form-panel mt-3">
+  <h2 class="h5 mb-3">Speicherung und Zugriff</h2>
+  <p class="text-secondary mb-0">
+    Die Daten liegen auf dem Server, auf dem MotoDB betrieben wird. Nutzer sehen ihre eigenen Daten.
+    Admins können Nutzer verwalten und haben technisch Zugriff auf Nutzer- und App-Daten.
+  </p>
+</section>
+
+<section class="form-panel mt-3">
+  <h2 class="h5 mb-3">Deine Rechte in der App</h2>
+  <p class="text-secondary mb-0">
+    Du kannst deine Garage als strukturierte ZIP-Datei exportieren und dein Profil samt Motorrädern,
+    Services, Checklisten und Uploads löschen. Falsche Daten kannst du in den jeweiligen Formularen
+    korrigieren.
+  </p>
+</section>
+
+<section class="form-panel mt-3">
+  <h2 class="h5 mb-3">Offline-Daten</h2>
+  <p class="text-secondary mb-0">
+    Offline erfasste Service-Einträge können kurzzeitig im Browser gespeichert werden und werden beim
+    nächsten Sync an den Server übertragen. Bilder und Belege werden nicht offline synchronisiert.
+  </p>
+</section>
+{% endblock %}

@@ -6,7 +6,6 @@ from flask import (
     Blueprint,
     abort,
     current_app,
-    flash,
     jsonify,
     redirect,
     render_template,
@@ -22,6 +21,7 @@ from app.auth import admin_required
 from app.models import (
     AppSetting,
     Motorcycle,
+    MotorcycleImage,
     ServiceChecklist,
     ServiceChecklistItem,
     ServiceEntry,
@@ -63,7 +63,10 @@ DEFAULT_CHECKLIST_CSV = "\n".join(
 
 @bp.app_context_processor
 def inject_settings():
-    return {"backup_path": get_backup_path()}
+    return {
+        "backup_path": get_backup_path(),
+        "disk_usage": get_disk_usage(),
+    }
 
 
 @bp.app_template_filter("number")
@@ -71,6 +74,20 @@ def number_filter(value):
     if value in (None, ""):
         return "-"
     return f"{int(value):,}".replace(",", ".")
+
+
+@bp.app_template_filter("filesize")
+def filesize_filter(value):
+    if value in (None, ""):
+        return "-"
+    size = float(value)
+    units = ["B", "KB", "MB", "GB", "TB"]
+    for unit in units:
+        if size < 1024 or unit == units[-1]:
+            if unit == "B":
+                return f"{int(size)} {unit}"
+            return f"{size:.1f} {unit}".replace(".", ",")
+        size /= 1024
 
 
 @bp.app_template_filter("date_de")
@@ -90,9 +107,6 @@ def datetime_filter(value):
 @bp.route("/")
 @login_required
 def index():
-    if current_user.is_admin:
-        return redirect(url_for("auth.admin_users"))
-
     query = Motorcycle.query if current_user.is_admin else Motorcycle.query.filter_by(user_id=current_user.id)
     search = request.args.get("q", "").strip()
     sort = request.args.get("sort", "marke")
@@ -140,6 +154,11 @@ def backup_path_update():
 @login_required
 def settings():
     return render_template("settings.html")
+
+
+@bp.route("/datenschutz")
+def privacy():
+    return render_template("privacy.html")
 
 
 @bp.route("/checklisten/neu", methods=["GET", "POST"])
@@ -234,22 +253,17 @@ def technical_csv_template():
 @bp.route("/motorrad/neu", methods=["GET", "POST"])
 @login_required
 def motorcycle_new():
-    if current_user.is_admin:
-        flash("Admins verwalten Nutzerkonten. Motorräder legen Nutzer selbst an.", "info")
-        return redirect(url_for("auth.admin_users"))
-
     motorcycle = Motorcycle()
     if request.method == "POST":
         fill_motorcycle(motorcycle)
         motorcycle.user_id = current_user.id
         db.session.add(motorcycle)
         db.session.flush()
-        image_path, _ = save_upload(request.files.get("bild"), motorcycle.id, "images")
-        if image_path:
-            motorcycle.bild = image_path
+        uploaded_images = request.files.getlist("bilder") or [request.files.get("bild")]
+        add_motorcycle_images(motorcycle, uploaded_images)
         db.session.commit()
         return redirect(url_for("main.motorcycle_detail", motorrad_id=motorcycle.id))
-    return render_template("motorcycles/form.html", motorcycle=motorcycle, title="Motorrad anlegen")
+    return render_template("motorcycles/form.html", motorcycle=motorcycle, title="Motorrad anlegen", gallery_images=[])
 
 
 @bp.route("/motorrad/<int:motorrad_id>")
@@ -257,6 +271,8 @@ def motorcycle_new():
 def motorcycle_detail(motorrad_id):
     motorcycle = require_motorcycle_ownership(motorrad_id)
     ensure_motorcycle_mileage_is_current(motorcycle)
+    gallery_images = ordered_motorcycle_images(motorcycle)
+    primary_image = gallery_images[0] if gallery_images else None
     owner_filter = {} if current_user.is_admin else {"user_id": current_user.id}
     services = (
         ServiceEntry.query.filter_by(motorrad_id=motorrad_id, **owner_filter)
@@ -288,6 +304,8 @@ def motorcycle_detail(motorrad_id):
     return render_template(
         "motorcycles/detail.html",
         motorcycle=motorcycle,
+        gallery_images=gallery_images,
+        primary_image=primary_image,
         services=services,
         costs_by_category=costs_by_category,
         total_costs=total_costs,
@@ -304,21 +322,57 @@ def motorcycle_edit(motorrad_id):
     ensure_motorcycle_mileage_is_current(motorcycle)
     if request.method == "POST":
         fill_motorcycle(motorcycle)
-        image_path, _ = save_upload(request.files.get("bild"), motorcycle.id, "images")
-        if image_path:
-            delete_upload_file(motorcycle.bild)
-            motorcycle.bild = image_path
+        uploaded_images = request.files.getlist("bilder") or [request.files.get("bild")]
+        add_motorcycle_images(motorcycle, uploaded_images)
         db.session.commit()
         return redirect(url_for("main.motorcycle_detail", motorrad_id=motorcycle.id))
-    return render_template("motorcycles/form.html", motorcycle=motorcycle, title="Motorrad bearbeiten")
+    return render_template(
+        "motorcycles/form.html",
+        motorcycle=motorcycle,
+        title="Motorrad bearbeiten",
+        gallery_images=ordered_motorcycle_images(motorcycle),
+    )
 
 
 @bp.route("/motorrad/<int:motorrad_id>/bild-loeschen", methods=["POST"])
 @login_required
 def motorcycle_image_delete(motorrad_id):
     motorcycle = require_motorcycle_ownership(motorrad_id)
-    delete_upload_file(motorcycle.bild)
-    motorcycle.bild = None
+    current_image = (
+        MotorcycleImage.query.filter_by(motorcycle_id=motorrad_id, path=motorcycle.bild)
+        .order_by(MotorcycleImage.position, MotorcycleImage.id)
+        .first()
+    )
+    if current_image:
+        delete_upload_file(current_image.path)
+        db.session.delete(current_image)
+        db.session.flush()
+    else:
+        delete_upload_file(motorcycle.bild)
+    sync_motorcycle_primary_image(motorcycle)
+    db.session.commit()
+    return redirect(url_for("main.motorcycle_edit", motorrad_id=motorrad_id))
+
+
+@bp.route("/motorrad/<int:motorrad_id>/bilder/<int:image_id>/loeschen", methods=["POST"])
+@login_required
+def motorcycle_gallery_image_delete(motorrad_id, image_id):
+    motorcycle = require_motorcycle_ownership(motorrad_id)
+    image = MotorcycleImage.query.filter_by(id=image_id, motorcycle_id=motorrad_id).first_or_404()
+    delete_upload_file(image.path)
+    db.session.delete(image)
+    db.session.flush()
+    sync_motorcycle_primary_image(motorcycle)
+    db.session.commit()
+    return redirect(url_for("main.motorcycle_edit", motorrad_id=motorrad_id))
+
+
+@bp.route("/motorrad/<int:motorrad_id>/bilder/<int:image_id>/titelbild", methods=["POST"])
+@login_required
+def motorcycle_gallery_image_make_primary(motorrad_id, image_id):
+    motorcycle = require_motorcycle_ownership(motorrad_id)
+    image = MotorcycleImage.query.filter_by(id=image_id, motorcycle_id=motorrad_id).first_or_404()
+    motorcycle.bild = image.path
     db.session.commit()
     return redirect(url_for("main.motorcycle_edit", motorrad_id=motorrad_id))
 
@@ -683,7 +737,10 @@ def fill_motorcycle(motorcycle):
     motorcycle.erstzulassung = parse_date(request.form.get("erstzulassung"))
     motorcycle.verkauft_am = parse_date(request.form.get("verkauft_am"))
     motorcycle.verkaufspreis = parse_int(request.form.get("verkaufspreis"))
-    motorcycle.aktiv = request.form.get("aktiv") == "on"
+    if "aktiv" in request.form:
+        motorcycle.aktiv = request.form.get("aktiv") == "on"
+    elif motorcycle.id is None and motorcycle.aktiv is None:
+        motorcycle.aktiv = True
     motorcycle.notizen = request.form.get("notizen")
 
 
@@ -783,6 +840,41 @@ def delete_motorcycle_uploads(motorrad_id):
         abort(400)
     if target.is_dir():
         shutil.rmtree(target)
+
+
+def add_motorcycle_images(motorcycle, files):
+    next_position = MotorcycleImage.query.filter_by(motorcycle_id=motorcycle.id).count()
+    created = []
+    for file_storage in files:
+        image_path, original_name = save_upload(file_storage, motorcycle.id, "images")
+        if not image_path:
+            continue
+        image = MotorcycleImage(
+            motorcycle_id=motorcycle.id,
+            path=image_path,
+            original_name=original_name,
+            position=next_position,
+        )
+        db.session.add(image)
+        created.append(image)
+        next_position += 1
+        if not motorcycle.bild:
+            motorcycle.bild = image_path
+    return created
+
+
+def ordered_motorcycle_images(motorcycle):
+    images = list(motorcycle.images)
+    if not images:
+        return []
+    if motorcycle.bild:
+        images.sort(key=lambda image: (image.path != motorcycle.bild, image.position, image.id))
+    return images
+
+
+def sync_motorcycle_primary_image(motorcycle):
+    images = ordered_motorcycle_images(motorcycle)
+    motorcycle.bild = images[0].path if images else None
 
 
 def split_lines(text):
@@ -1048,6 +1140,23 @@ def serialize_service(service):
 def get_backup_path():
     setting = AppSetting.query.get("backup_path")
     return setting.value if setting and setting.value else "/PFAD/ZUM/SICHERUNGSORDNER"
+
+
+def get_disk_usage():
+    try:
+        usage = shutil.disk_usage(current_app.instance_path)
+    except OSError:
+        return None
+
+    percent_used = round((usage.used / usage.total) * 100) if usage.total else 0
+    return {
+        "path": current_app.instance_path,
+        "total": usage.total,
+        "used": usage.used,
+        "free": usage.free,
+        "percent_used": min(percent_used, 100),
+        "percent_free": max(100 - percent_used, 0),
+    }
 
 
 def create_sync_backup():

@@ -6,24 +6,42 @@
   <div>
     <h1 class="h3 mb-1">Einstellungen</h1>
   </div>
-  <a class="btn btn-outline-secondary" href="{{ request.referrer or url_for('main.index') }}">Zurück</a>
 </div>
 
 <section class="form-panel mt-3">
   <h2 class="h5 mb-3">Konto</h2>
   <p class="text-secondary">{{ current_user.email }}</p>
-  <div class="d-flex gap-2">
-    <a class="btn btn-outline-secondary" href="{{ url_for('auth.change_password') }}">Passwort ändern</a>
-    <a class="btn btn-outline-danger" href="{{ url_for('auth.user_delete') }}">Profil löschen</a>
+  <div class="settings-actions">
+    <a class="btn btn-outline-secondary btn-icon" href="{{ url_for('auth.change_password') }}" aria-label="Passwort ändern" title="Passwort ändern">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M7 10V7a5 5 0 0 1 10 0v3"></path>
+        <rect x="5" y="10" width="14" height="10" rx="2"></rect>
+        <path d="M12 14v2"></path>
+      </svg>
+    </a>
+    <a class="btn btn-outline-secondary btn-icon" href="{{ url_for('auth.user_export') }}" aria-label="Garage herunterladen" title="Garage herunterladen">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 3v11"></path>
+        <path d="M7 10l5 5 5-5"></path>
+        <path d="M5 19h14"></path>
+      </svg>
+    </a>
+    <a class="btn btn-outline-danger btn-icon" href="{{ url_for('auth.user_delete') }}" aria-label="Profil löschen" title="Profil löschen">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M3 6h18"></path>
+        <path d="M8 6V4h8v2"></path>
+        <path d="M19 6l-1 14H6L5 6"></path>
+        <path d="M10 11v5"></path>
+        <path d="M14 11v5"></path>
+      </svg>
+    </a>
   </div>
+  <p class="mb-0 mt-3">
+    <a href="{{ url_for('main.privacy') }}">Datenschutzhinweise</a>
+  </p>
 </section>
 
 {% if current_user.is_admin %}
-  <section class="form-panel mt-3">
-    <h2 class="h5 mb-3">Administration</h2>
-    <a class="btn btn-outline-secondary" href="{{ url_for('auth.admin_users') }}">Nutzerverwaltung</a>
-  </section>
-
   <form class="form-panel mt-3" method="post" action="{{ url_for('main.backup_path_update') }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <h2 class="h5 mb-3">Sicherungsort</h2>
@@ -33,22 +51,21 @@
       <button class="btn btn-primary" type="submit">Speichern</button>
     </div>
   </form>
-
-{% else %}
-  <section class="form-panel mt-3">
-    <h2 class="h5 mb-3">Service-Checklisten</h2>
-    <div class="d-flex gap-2">
-      <a class="btn btn-outline-secondary" href="{{ url_for('main.checklist_new_global') }}">Checkliste anlegen</a>
-      <a class="btn btn-outline-secondary" href="{{ url_for('main.checklist_csv_template') }}">Checklisten-Vorlage</a>
-    </div>
-  </section>
-
-  <section class="form-panel mt-3">
-    <h2 class="h5 mb-3">Datenblätter</h2>
-    <div class="d-flex gap-2">
-      <a class="btn btn-outline-secondary" href="{{ url_for('main.technical_data_global') }}">Technische Daten</a>
-      <a class="btn btn-outline-secondary" href="{{ url_for('main.technical_csv_template') }}">Datenblatt-Vorlage</a>
-    </div>
-  </section>
 {% endif %}
+
+<section class="form-panel mt-3">
+  <h2 class="h5 mb-3">Service-Checklisten</h2>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-secondary" href="{{ url_for('main.checklist_new_global') }}">Checkliste anlegen</a>
+    <a class="btn btn-outline-secondary" href="{{ url_for('main.checklist_csv_template') }}">Checklisten-Vorlage</a>
+  </div>
+</section>
+
+<section class="form-panel mt-3">
+  <h2 class="h5 mb-3">Datenblätter</h2>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-secondary" href="{{ url_for('main.technical_data_global') }}">Technische Daten</a>
+    <a class="btn btn-outline-secondary" href="{{ url_for('main.technical_csv_template') }}">Datenblatt-Vorlage</a>
+  </div>
+</section>
 {% endblock %}

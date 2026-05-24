@@ -72,6 +72,22 @@ class Motorcycle(db.Model):
     checklists = db.relationship(
         "ServiceChecklist", backref="motorcycle", cascade="all, delete-orphan", lazy=True
     )
+    images = db.relationship(
+        "MotorcycleImage",
+        backref="motorcycle",
+        cascade="all, delete-orphan",
+        lazy=True,
+        order_by="MotorcycleImage.position, MotorcycleImage.id",
+    )
+
+
+class MotorcycleImage(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    motorcycle_id = db.Column(db.Integer, db.ForeignKey("motorcycle.id"), nullable=False)
+    path = db.Column(db.String(255), nullable=False)
+    original_name = db.Column(db.String(255))
+    position = db.Column(db.Integer, default=0, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
 
 class ServiceEntry(db.Model):

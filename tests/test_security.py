@@ -1,12 +1,15 @@
+import json
 import os
 import tempfile
 import unittest
+import zipfile
 from datetime import date
+from io import BytesIO
 from pathlib import Path
 from unittest.mock import patch
 
 from app import create_app, db
-from app.models import Motorcycle, ServiceChecklist, ServiceChecklistItem, ServiceEntry, User
+from app.models import Motorcycle, MotorcycleImage, ServiceChecklist, ServiceChecklistItem, ServiceEntry, TechnicalSpec, User
 
 
 class SecurityTestCase(unittest.TestCase):
@@ -137,11 +140,13 @@ class SecurityTestCase(unittest.TestCase):
             self.assertEqual(response.status_code, 200)
             self.assertIn(b"Einstellungen", response.data)
             self.assertIn(b"Profil l", response.data)
+            self.assertIn(b"Garage herunterladen", response.data)
             self.assertIn(b"Service-Checklisten", response.data)
             self.assertIn(b"Technische Daten", response.data)
             self.assertNotIn(b"Sicherungsort", response.data)
+            self.assertNotIn(b"Speicherplatz", response.data)
 
-    def test_admin_starts_in_user_management_without_user_service_settings(self):
+    def test_admin_uses_garage_with_extra_user_management(self):
         with tempfile.TemporaryDirectory() as tempdir:
             app = self.build_app(tempdir)
             with app.app_context():
@@ -160,19 +165,26 @@ class SecurityTestCase(unittest.TestCase):
                 session["_fresh"] = True
 
             index_response = client.get("/")
+            new_motorcycle_response = client.get("/motorrad/neu")
             users_response = client.get("/admin/users")
             settings_response = client.get("/einstellungen")
 
-            self.assertEqual(index_response.status_code, 302)
-            self.assertEqual(index_response.headers["Location"], "/admin/users")
+            self.assertEqual(index_response.status_code, 200)
+            self.assertIn(b"Garage", index_response.data)
+            self.assertIn(b"CB500", index_response.data)
+            self.assertIn(b"Nutzerverwaltung", index_response.data)
+            self.assertEqual(new_motorcycle_response.status_code, 200)
+            self.assertIn(b"Motorrad anlegen", new_motorcycle_response.data)
             self.assertEqual(users_response.status_code, 200)
             self.assertIn(b"Admin", users_response.data)
             self.assertIn(b"rider@example.com", users_response.data)
             self.assertIn(b"1 Maschinen", users_response.data)
-            self.assertNotIn(b"Motorrad anlegen", users_response.data)
             self.assertIn(b"Sicherungsort", settings_response.data)
-            self.assertNotIn(b"Service-Checklisten", settings_response.data)
-            self.assertNotIn(b"Technische Daten", settings_response.data)
+            self.assertNotIn(b"Speicherplatz", settings_response.data)
+            self.assertNotIn(b"Administration", settings_response.data)
+            self.assertIn(b"Service-Checklisten", settings_response.data)
+            self.assertIn(b"Technische Daten", settings_response.data)
+            self.assertIn(b"Speicherplatz", users_response.data)
 
     def test_admin_can_delete_user_data_and_uploads(self):
         with tempfile.TemporaryDirectory() as tempdir:
@@ -267,6 +279,147 @@ class SecurityTestCase(unittest.TestCase):
                 self.assertEqual(ServiceEntry.query.count(), 0)
                 self.assertEqual(ServiceChecklist.query.count(), 0)
                 self.assertEqual(ServiceChecklistItem.query.count(), 0)
+
+    def test_motorcycle_gallery_management_updates_primary_image(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            app = self.build_app(tempdir)
+            app.config.update(WTF_CSRF_ENABLED=False)
+            with app.app_context():
+                user = User(username="gallery", email="gallery@example.com")
+                user.set_password("gallery-password")
+                db.session.add(user)
+                db.session.flush()
+
+                motorcycle = Motorcycle(user_id=user.id, marke="BMW", modell="R80")
+                db.session.add(motorcycle)
+                db.session.flush()
+
+                first_path = f"{motorcycle.id}/images/first.jpg"
+                second_path = f"{motorcycle.id}/images/second.jpg"
+                upload_root = Path(app.config["UPLOAD_FOLDER"])
+                (upload_root / first_path).parent.mkdir(parents=True, exist_ok=True)
+                (upload_root / first_path).write_bytes(b"first-image")
+                (upload_root / second_path).write_bytes(b"second-image")
+
+                motorcycle.bild = first_path
+                first_image = MotorcycleImage(motorcycle_id=motorcycle.id, path=first_path, position=0)
+                second_image = MotorcycleImage(motorcycle_id=motorcycle.id, path=second_path, position=1)
+                db.session.add_all([first_image, second_image])
+                db.session.commit()
+
+                user_id = user.id
+                motorcycle_id = motorcycle.id
+                second_image_id = second_image.id
+
+            client = app.test_client()
+            with client.session_transaction() as session:
+                session["_user_id"] = str(user_id)
+                session["_fresh"] = True
+
+            make_primary_response = client.post(f"/motorrad/{motorcycle_id}/bilder/{second_image_id}/titelbild")
+
+            self.assertEqual(make_primary_response.status_code, 302)
+            self.assertEqual(make_primary_response.headers["Location"], f"/motorrad/{motorcycle_id}/bearbeiten")
+            with app.app_context():
+                updated_motorcycle = db.session.get(Motorcycle, motorcycle_id)
+                self.assertEqual(updated_motorcycle.bild, second_path)
+
+            delete_response = client.post(f"/motorrad/{motorcycle_id}/bilder/{second_image_id}/loeschen")
+
+            self.assertEqual(delete_response.status_code, 302)
+            self.assertEqual(delete_response.headers["Location"], f"/motorrad/{motorcycle_id}/bearbeiten")
+            self.assertFalse((Path(app.config["UPLOAD_FOLDER"]) / second_path).exists())
+            with app.app_context():
+                updated_motorcycle = db.session.get(Motorcycle, motorcycle_id)
+                self.assertEqual(updated_motorcycle.bild, first_path)
+                self.assertEqual(MotorcycleImage.query.filter_by(motorcycle_id=motorcycle_id).count(), 1)
+
+    def test_user_export_groups_data_by_motorcycle(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            app = self.build_app(tempdir)
+            with app.app_context():
+                user = User(username="exporter", email="exporter@example.com")
+                user.set_password("exporter-password")
+                db.session.add(user)
+                db.session.flush()
+
+                motorcycle = Motorcycle(user_id=user.id, marke="Honda", modell="Transalp", bild="1/images/titel.jpg")
+                db.session.add(motorcycle)
+                db.session.flush()
+
+                db.session.add(
+                    MotorcycleImage(
+                        motorcycle_id=motorcycle.id,
+                        path=f"{motorcycle.id}/images/titel.jpg",
+                        original_name="titel.jpg",
+                        position=0,
+                    )
+                )
+                db.session.add(
+                    ServiceEntry(
+                        user_id=user.id,
+                        motorrad_id=motorcycle.id,
+                        titel="Inspektion",
+                        datum=date(2026, 5, 24),
+                        kategorie="Wartung",
+                        beleg=f"{motorcycle.id}/receipts/rechnung.pdf",
+                        beleg_originalname="rechnung.pdf",
+                    )
+                )
+                db.session.add(
+                    TechnicalSpec(
+                        user_id=user.id,
+                        motorrad_id=motorcycle.id,
+                        name="Leistung",
+                        wert="50",
+                        einheit="PS",
+                        kategorie="Motor",
+                    )
+                )
+                checklist = ServiceChecklist(
+                    user_id=user.id,
+                    motorrad_id=motorcycle.id,
+                    titel="Frühjahrscheck",
+                    is_template=False,
+                )
+                db.session.add(checklist)
+                db.session.flush()
+                db.session.add(ServiceChecklistItem(checklist_id=checklist.id, text="Kette prüfen", position=1))
+                db.session.commit()
+
+                upload_root = Path(app.config["UPLOAD_FOLDER"])
+                image_path = upload_root / f"{motorcycle.id}/images/titel.jpg"
+                receipt_path = upload_root / f"{motorcycle.id}/receipts/rechnung.pdf"
+                image_path.parent.mkdir(parents=True, exist_ok=True)
+                receipt_path.parent.mkdir(parents=True, exist_ok=True)
+                image_path.write_bytes(b"image-bytes")
+                receipt_path.write_bytes(b"pdf-bytes")
+                user_id = user.id
+
+            client = app.test_client()
+            with client.session_transaction() as session:
+                session["_user_id"] = str(user_id)
+                session["_fresh"] = True
+
+            response = client.get("/user/export")
+
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.headers["Content-Disposition"], 'attachment; filename=meineGarage.zip')
+
+            with zipfile.ZipFile(BytesIO(response.data)) as archive:
+                names = set(archive.namelist())
+                self.assertIn("profil.json", names)
+                self.assertIn("Honda_Transalp/daten.json", names)
+                self.assertIn("Honda_Transalp/bilder/titel.jpg", names)
+                self.assertIn("Honda_Transalp/belege/rechnung.pdf", names)
+
+                export_json = json.loads(archive.read("Honda_Transalp/daten.json"))
+                self.assertEqual(export_json["motorrad"]["modell"], "Transalp")
+                self.assertEqual(len(export_json["bilder"]), 1)
+                self.assertEqual(len(export_json["services"]), 1)
+                self.assertEqual(len(export_json["technische_daten"]), 1)
+                self.assertEqual(len(export_json["checklisten"]), 1)
+                self.assertEqual(export_json["checklisten"][0]["items"][0]["text"], "Kette prüfen")
 
 
 if __name__ == "__main__":

@@ -7,7 +7,6 @@
     <h1 class="h3 mb-1">Admin</h1>
     <p class="text-secondary mb-0">Nutzer, Rollen und Datenbestand verwalten.</p>
   </div>
-  <a class="btn btn-outline-secondary" href="{{ url_for('main.settings') }}">Einstellungen</a>
 </div>
 
 {% if users %}
@@ -24,6 +23,33 @@
       <span>Admins</span>
       <strong>{{ stats.admins }}</strong>
     </div>
+  </section>
+
+  <section class="form-panel mb-3">
+    <h2 class="h5 mb-3">Speicherplatz</h2>
+    {% if disk_usage %}
+      <p class="text-secondary mb-3">
+        App-Laufwerk:
+        <span class="path-truncate" title="{{ disk_usage.path }}">{{ disk_usage.path }}</span>
+      </p>
+      <progress class="storage-meter" max="100" value="{{ disk_usage.percent_used }}" aria-label="{{ disk_usage.percent_free }} Prozent frei"></progress>
+      <div class="storage-stats mt-3">
+        <div class="storage-row">
+          <span>Frei</span>
+          <strong>{{ disk_usage.free|filesize }}</strong>
+        </div>
+        <div class="storage-row">
+          <span>Belegt</span>
+          <strong>{{ disk_usage.used|filesize }}</strong>
+        </div>
+        <div class="storage-row">
+          <span>Gesamt</span>
+          <strong>{{ disk_usage.total|filesize }}</strong>
+        </div>
+      </div>
+    {% else %}
+      <p class="text-secondary mb-0">Der Speicherplatz konnte gerade nicht gelesen werden.</p>
+    {% endif %}
   </section>
 
   <div class="user-list">

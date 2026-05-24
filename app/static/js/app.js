@@ -52,6 +52,109 @@ document.querySelector("[data-toggle-sheet]")?.addEventListener("click", () => {
   sheet.toggleAttribute("hidden");
 });
 
+document.querySelectorAll("[data-sheet] .spec-group").forEach((group) => {
+  group.removeAttribute("open");
+});
+
+const imageManager = document.querySelector("[data-image-manager]");
+if (imageManager) {
+  const slides = Array.from(imageManager.querySelectorAll("[data-image-manager-slide]"));
+  const currentLabel = imageManager.querySelector("[data-image-manager-current]");
+  let activeIndex = slides.findIndex((slide) => slide.classList.contains("is-active"));
+  if (activeIndex < 0) activeIndex = 0;
+
+  const renderImageManager = (index) => {
+    if (!slides.length) return;
+    activeIndex = (index + slides.length) % slides.length;
+    slides.forEach((slide, slideIndex) => {
+      const isActive = slideIndex === activeIndex;
+      slide.hidden = !isActive;
+      slide.classList.toggle("is-active", isActive);
+    });
+    if (currentLabel) {
+      currentLabel.textContent = String(activeIndex + 1);
+    }
+  };
+
+  imageManager.querySelector("[data-image-manager-prev]")?.addEventListener("click", () => {
+    renderImageManager(activeIndex - 1);
+  });
+
+  imageManager.querySelector("[data-image-manager-next]")?.addEventListener("click", () => {
+    renderImageManager(activeIndex + 1);
+  });
+
+  renderImageManager(activeIndex);
+}
+
+const galleryViewer = document.querySelector("[data-gallery]");
+if (galleryViewer) {
+  const slides = Array.from(galleryViewer.querySelectorAll("[data-gallery-slide]"));
+  const thumbs = Array.from(galleryViewer.querySelectorAll("[data-gallery-thumb]"));
+  const currentLabel = galleryViewer.querySelector("[data-gallery-current]");
+  let activeIndex = 0;
+
+  const renderGallery = (index) => {
+    if (!slides.length) return;
+    activeIndex = (index + slides.length) % slides.length;
+    slides.forEach((slide, slideIndex) => {
+      const isActive = slideIndex === activeIndex;
+      slide.hidden = !isActive;
+      slide.classList.toggle("is-active", isActive);
+    });
+    thumbs.forEach((thumb, thumbIndex) => {
+      thumb.classList.toggle("is-active", thumbIndex === activeIndex);
+    });
+    if (currentLabel) {
+      currentLabel.textContent = String(activeIndex + 1);
+    }
+  };
+
+  const closeGallery = () => {
+    galleryViewer.hidden = true;
+    galleryViewer.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("body--modal-open");
+  };
+
+  const openGallery = (index) => {
+    renderGallery(index);
+    galleryViewer.hidden = false;
+    galleryViewer.setAttribute("aria-hidden", "false");
+    document.body.classList.add("body--modal-open");
+  };
+
+  document.querySelectorAll("[data-gallery-open]").forEach((trigger) => {
+    trigger.addEventListener("click", () => {
+      openGallery(Number(trigger.dataset.galleryIndex || 0));
+    });
+  });
+
+  galleryViewer.querySelectorAll("[data-gallery-close]").forEach((trigger) => {
+    trigger.addEventListener("click", closeGallery);
+  });
+
+  galleryViewer.querySelector("[data-gallery-prev]")?.addEventListener("click", () => {
+    renderGallery(activeIndex - 1);
+  });
+
+  galleryViewer.querySelector("[data-gallery-next]")?.addEventListener("click", () => {
+    renderGallery(activeIndex + 1);
+  });
+
+  thumbs.forEach((thumb) => {
+    thumb.addEventListener("click", () => {
+      renderGallery(Number(thumb.dataset.galleryThumb || 0));
+    });
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (galleryViewer.hidden) return;
+    if (event.key === "Escape") closeGallery();
+    if (event.key === "ArrowLeft") renderGallery(activeIndex - 1);
+    if (event.key === "ArrowRight") renderGallery(activeIndex + 1);
+  });
+}
+
 document.querySelectorAll("[data-autosave-sheet] .spec-input").forEach((input) => {
   input.addEventListener("change", () => {
     input.form?.requestSubmit();
