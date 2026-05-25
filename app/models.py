@@ -19,6 +19,7 @@ class User(UserMixin, db.Model):
     services = db.relationship('ServiceEntry', backref='user', cascade='all, delete-orphan', lazy=True)
     technical_specs = db.relationship('TechnicalSpec', backref='user', cascade='all, delete-orphan', lazy=True)
     checklists = db.relationship('ServiceChecklist', backref='user', cascade='all, delete-orphan', lazy=True)
+    documents = db.relationship('MotorcycleDocument', backref='user', cascade='all, delete-orphan', lazy=True)
     audit_logs = db.relationship('AuditLog', backref='user', cascade='all, delete-orphan', lazy=True)
 
     def set_password(self, password):
@@ -79,6 +80,13 @@ class Motorcycle(db.Model):
         lazy=True,
         order_by="MotorcycleImage.position, MotorcycleImage.id",
     )
+    documents = db.relationship(
+        "MotorcycleDocument",
+        backref="motorcycle",
+        cascade="all, delete-orphan",
+        lazy=True,
+        order_by="MotorcycleDocument.created_at.desc(), MotorcycleDocument.id.desc()",
+    )
 
 
 class MotorcycleImage(db.Model):
@@ -88,6 +96,20 @@ class MotorcycleImage(db.Model):
     original_name = db.Column(db.String(255))
     position = db.Column(db.Integer, default=0, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+
+class MotorcycleDocument(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    motorrad_id = db.Column(db.Integer, db.ForeignKey("motorcycle.id"), nullable=False)
+    titel = db.Column(db.String(160), nullable=False)
+    kategorie = db.Column(db.String(80), nullable=False)
+    path = db.Column(db.String(255), nullable=False)
+    original_name = db.Column(db.String(255))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(
+        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
 
 
 class ServiceEntry(db.Model):

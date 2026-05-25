@@ -740,6 +740,13 @@ a {
   padding: 1rem;
 }
 
+.document-entry {
+  align-items: center;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+}
+
 .notice {
   background: #ecfdf5;
   border: 1px solid #a7f3d0;
@@ -1457,6 +1464,11 @@ a {
 }
 
 @media (max-width: 420px) {
+  .document-entry {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
   .motorcycle-grid {
     grid-template-columns: 1fr;
   }

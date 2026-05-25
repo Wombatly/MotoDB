@@ -16,29 +16,19 @@
           <span class="brand-mark">M</span>
           <span>Moto<span>DB</span></span>
         </a>
-        <div class="nav-menu">
-          <button class="menu-toggle" type="button" data-menu-toggle aria-expanded="false" aria-label="Menü öffnen">
-            <span></span>
-            <span></span>
-            <span></span>
-          </button>
-          <div class="nav-actions" data-menu>
-            {% if current_user.is_authenticated %}
-              {% if current_user.is_admin %}
-                <a class="menu-item" href="{{ url_for('auth.admin_users') }}">Nutzerverwaltung</a>
-              {% endif %}
-              <form method="post" action="{{ url_for('auth.logout') }}">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <button class="menu-item" type="submit">Abmelden</button>
-              </form>
-              <button class="menu-item" id="syncButton" type="button">Sync</button>
-            {% else %}
-              <a class="menu-item" href="{{ url_for('auth.login') }}">Anmelden</a>
-              {% if config.MOTODB_ALLOW_REGISTRATION %}
-                <a class="menu-item" href="{{ url_for('auth.register') }}">Registrieren</a>
-              {% endif %}
-            {% endif %}
-          </div>
+        <div class="nav-tools">
+          {% if current_user.is_authenticated %}
+            <button class="btn btn-outline-secondary btn-icon" id="syncButton" type="button" aria-label="Synchronisieren" title="Synchronisieren">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M21 12a9 9 0 0 1-15.2 6.5"></path>
+                <path d="M3 12A9 9 0 0 1 18.2 5.5"></path>
+                <path d="M18 2v4h-4"></path>
+                <path d="M6 22v-4h4"></path>
+              </svg>
+            </button>
+          {% else %}
+            <a class="btn btn-outline-secondary" href="{{ url_for('auth.login') }}">Anmelden</a>
+          {% endif %}
         </div>
       </div>
     </nav>
@@ -64,11 +54,11 @@
           </span>
           <span>Übersicht</span>
         </a>
-        <a class="bottom-nav__item" href="{{ url_for('main.technical_data_global') }}">
+        <a class="bottom-nav__item" href="{{ url_for('main.documents') }}">
           <span class="bottom-nav__icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 0 0-5 5L4 17v3h3l5.7-5.7a4 4 0 0 0 5-5l-2.8 2.8-2-2 2.8-2.8Z"/></svg>
+            <svg viewBox="0 0 24 24"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v5h4"/><path d="M9.5 12h5"/><path d="M9.5 16h5"/></svg>
           </span>
-          <span>Technik</span>
+          <span>Dokumente</span>
         </a>
         <a class="bottom-nav__fab" href="{{ url_for('main.motorcycle_new') }}" aria-label="Motorrad anlegen">+</a>
         <a class="bottom-nav__item" href="{{ url_for('main.checklist_new_global') }}">

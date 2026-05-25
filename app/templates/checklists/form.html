@@ -1,10 +1,10 @@
 {% extends "base.html" %}
-{% block title %}Checkliste anlegen{% endblock %}
+{% block title %}{% if checklist %}Checkliste bearbeiten{% else %}Checkliste anlegen{% endif %}{% endblock %}
 
 {% block content %}
 <div class="d-flex align-items-start justify-content-between gap-3 mb-3">
   <div>
-    <h1 class="h3 mb-1">Checkliste anlegen</h1>
+    <h1 class="h3 mb-1">{% if checklist %}Checkliste bearbeiten{% else %}Checkliste anlegen{% endif %}</h1>
     <p class="text-secondary mb-0">Vorlage mit Prüfpunkten und Kommentaren speichern.</p>
   </div>
   {% if motorcycle %}
@@ -20,7 +20,10 @@
   <div class="row g-3">
     <div class="col-12">
       <label class="form-label" for="motorrad_id">Motorrad</label>
-      <select class="form-select" id="motorrad_id" name="motorrad_id" required>
+      {% if checklist %}
+        <input type="hidden" name="motorrad_id" value="{{ motorcycle.id }}">
+      {% endif %}
+      <select class="form-select" id="motorrad_id" name="motorrad_id" {% if checklist %}disabled{% else %}required{% endif %}>
         {% for option in motorcycles %}
           <option value="{{ option.id }}" {% if motorcycle and option.id == motorcycle.id %}selected{% endif %}>{{ option.marke }} {{ option.modell }}</option>
         {% endfor %}
@@ -28,27 +31,42 @@
     </div>
     <div class="col-12">
       <label class="form-label" for="titel">Titel</label>
-      <input class="form-control" id="titel" name="titel" value="{{ preset.titel or '' }}" required>
+      <input class="form-control" id="titel" name="titel" value="{{ checklist.titel if checklist else preset.titel or '' }}" required>
     </div>
     <div class="col-6 col-md-2">
       <label class="form-label" for="intervall_km">km</label>
-      <input class="form-control number-input" id="intervall_km" name="intervall_km" inputmode="numeric" value="{{ preset.intervall_km or '' }}">
+      <input class="form-control number-input" id="intervall_km" name="intervall_km" inputmode="numeric" data-number-suffix="km" value="{{ checklist.intervall_km if checklist else preset.intervall_km or '' }}">
     </div>
     <div class="col-6 col-md-2">
       <label class="form-label" for="intervall_monate">Intervall</label>
-      <input class="form-control number-input" id="intervall_monate" name="intervall_monate" inputmode="numeric" value="{{ preset.intervall_monate or '' }}">
+      <input class="form-control number-input" id="intervall_monate" name="intervall_monate" inputmode="numeric" value="{{ checklist.intervall_monate if checklist else preset.intervall_monate or '' }}">
     </div>
   </div>
 
-  <div class="import-panel mt-4">
-    <h2 class="h5 mb-2">CSV einlesen</h2>
-    <p class="text-secondary mb-2">Format: Motorrad;Titel;km;Intervall;Position;Pruefpunkt;Kommentar</p>
-    <input class="form-control" id="csv_file" name="csv_file" type="file" accept=".csv,text/csv">
-  </div>
+  {% if not checklist %}
+    <div class="import-panel mt-4">
+      <h2 class="h5 mb-2">CSV einlesen</h2>
+      <p class="text-secondary mb-2">Format: Motorrad;Titel;km;Intervall;Position;Pruefpunkt;Kommentar</p>
+      <input class="form-control" id="csv_file" name="csv_file" type="file" accept=".csv,text/csv">
+    </div>
+  {% endif %}
 
   <h2 class="h5 mt-4 mb-3">Prüfpunkte</h2>
   <div class="checklist-builder">
-    {% set preset_items = preset.get("items", []) %}
+    {% set existing_items = checklist.items if checklist else [] %}
+    {% for item in existing_items %}
+      <div class="checklist-builder-row">
+        <div>
+          <label class="form-label">Prüfpunkt</label>
+          <input class="form-control" name="item_text" value="{{ item.text }}">
+        </div>
+        <div>
+          <label class="form-label">Kommentar</label>
+          <textarea class="form-control" name="item_comment" rows="2">{{ item.kommentar_vorlage or '' }}</textarea>
+        </div>
+      </div>
+    {% endfor %}
+    {% set preset_items = [] if checklist else preset.get("items", []) %}
     {% for item in preset_items %}
       <div class="checklist-builder-row">
         <div>
@@ -61,7 +79,8 @@
         </div>
       </div>
     {% endfor %}
-    {% for _ in range(10 - preset_items|length if preset_items|length < 10 else 3) %}
+    {% set existing_count = existing_items|length + preset_items|length %}
+    {% for _ in range(10 - existing_count if existing_count < 10 else 3) %}
       <div class="checklist-builder-row">
         <div>
           <label class="form-label">Prüfpunkt</label>
@@ -78,11 +97,11 @@
   <div class="row g-3">
     <div class="col-12">
       <label class="form-label" for="anmerkungen">Anmerkungen</label>
-      <textarea class="form-control" id="anmerkungen" name="anmerkungen" rows="3"></textarea>
+      <textarea class="form-control" id="anmerkungen" name="anmerkungen" rows="3">{{ checklist.anmerkungen or '' if checklist else '' }}</textarea>
     </div>
   </div>
   <div class="d-flex gap-2 mt-4">
-    <button class="btn btn-primary" type="submit">Anlegen</button>
+    <button class="btn btn-primary" type="submit">{% if checklist %}Speichern{% else %}Anlegen{% endif %}</button>
     {% if motorcycle %}
       <a class="btn btn-outline-secondary" href="{{ url_for('main.checklist_index', motorrad_id=motorcycle.id) }}">Abbrechen</a>
     {% else %}

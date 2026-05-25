@@ -155,9 +155,29 @@ class SecurityTestCase(unittest.TestCase):
                 user.set_password("rider-password")
                 db.session.add(user)
                 db.session.flush()
-                db.session.add(Motorcycle(user_id=user.id, marke="Honda", modell="CB500"))
+                admin_motorcycle = Motorcycle(user_id=admin.id, marke="BMW", modell="R80")
+                user_motorcycle = Motorcycle(user_id=user.id, marke="Honda", modell="CB500")
+                db.session.add_all([admin_motorcycle, user_motorcycle])
+                db.session.flush()
+                db.session.add(
+                    ServiceEntry(
+                        user_id=user.id,
+                        motorrad_id=user_motorcycle.id,
+                        datum=date(2026, 5, 24),
+                        kategorie="Wartung",
+                    )
+                )
+                db.session.add(
+                    ServiceChecklist(
+                        user_id=user.id,
+                        motorrad_id=user_motorcycle.id,
+                        titel="Jahresservice",
+                        is_template=True,
+                    )
+                )
                 db.session.commit()
                 admin_id = admin.id
+                user_motorcycle_id = user_motorcycle.id
 
             client = app.test_client()
             with client.session_transaction() as session:
@@ -171,8 +191,12 @@ class SecurityTestCase(unittest.TestCase):
 
             self.assertEqual(index_response.status_code, 200)
             self.assertIn(b"Garage", index_response.data)
-            self.assertIn(b"CB500", index_response.data)
-            self.assertIn(b"Nutzerverwaltung", index_response.data)
+            self.assertIn(b"R80", index_response.data)
+            self.assertNotIn(b"CB500", index_response.data)
+            self.assertIn(b"Dokumente", index_response.data)
+            self.assertNotIn(b"Technik", index_response.data)
+            self.assertIn(b"Nutzerverwaltung", settings_response.data)
+            self.assertEqual(client.get(f"/motorrad/{user_motorcycle_id}").status_code, 403)
             self.assertEqual(new_motorcycle_response.status_code, 200)
             self.assertIn(b"Motorrad anlegen", new_motorcycle_response.data)
             self.assertEqual(users_response.status_code, 200)
@@ -184,6 +208,8 @@ class SecurityTestCase(unittest.TestCase):
             self.assertNotIn(b"Administration", settings_response.data)
             self.assertIn(b"Service-Checklisten", settings_response.data)
             self.assertIn(b"Technische Daten", settings_response.data)
+            self.assertIn(b"Services", users_response.data)
+            self.assertIn(b"Checklisten", users_response.data)
             self.assertIn(b"Speicherplatz", users_response.data)
 
     def test_admin_can_delete_user_data_and_uploads(self):

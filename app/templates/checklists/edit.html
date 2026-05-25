@@ -26,7 +26,7 @@
     </div>
     <div class="col-12 col-md-6">
       <label class="form-label" for="kilometerstand">Kilometerstand</label>
-      <input class="form-control number-input" id="kilometerstand" name="kilometerstand" inputmode="numeric" value="{{ checklist.kilometerstand or '' }}" {% if not checklist.is_template %}disabled{% endif %}>
+      <input class="form-control number-input" id="kilometerstand" name="kilometerstand" inputmode="numeric" data-number-suffix="km" value="{{ checklist.kilometerstand or '' }}" {% if not checklist.is_template %}disabled{% endif %}>
     </div>
   </div>
 

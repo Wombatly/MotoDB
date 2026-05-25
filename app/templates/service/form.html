@@ -34,11 +34,11 @@
     </div>
     <div class="col-12 col-md-6" data-service-common-field>
       <label class="form-label" for="kilometerstand">Kilometerstand</label>
-      <input class="form-control number-input" id="kilometerstand" name="kilometerstand" inputmode="numeric" value="{{ service.kilometerstand or '' }}">
+      <input class="form-control number-input" id="kilometerstand" name="kilometerstand" inputmode="numeric" data-number-suffix="km" value="{{ service.kilometerstand or '' }}">
     </div>
     <div class="col-12 col-md-6" data-free-service-field>
       <label class="form-label" for="kosten">Kosten</label>
-      <input class="form-control number-input" id="kosten" name="kosten" inputmode="numeric" value="{{ service.kosten or '' }}">
+      <input class="form-control number-input" id="kosten" name="kosten" inputmode="numeric" data-number-suffix="€" value="{{ service.kosten or '' }}">
     </div>
     <div class="col-12" data-free-service-field>
       <label class="form-label" for="beschreibung">Beschreibung</label>

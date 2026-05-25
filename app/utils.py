@@ -272,6 +272,7 @@ def save_upload(file_storage, motorcycle_id, folder):
     allowed_extensions = {
         "images": {".jpg", ".jpeg", ".png", ".webp"},
         "receipts": {".jpg", ".jpeg", ".png", ".webp", ".pdf"},
+        "documents": {".jpg", ".jpeg", ".png", ".webp", ".pdf"},
     }
     if extension not in allowed_extensions.get(folder, set()):
         return None, None

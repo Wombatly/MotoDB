@@ -12,7 +12,7 @@
   <div class="detail-hero__copy">
     <p class="eyebrow mb-1">{{ motorcycle.marke }}</p>
     <h1 class="h3 mb-1">{{ motorcycle.modell }}</h1>
-    <p class="text-secondary mb-0">{{ motorcycle.baujahr or "Baujahr offen" }} · {{ motorcycle.kilometerstand|number }} km</p>
+    <p class="text-secondary mb-0">{{ motorcycle.baujahr or "Baujahr offen" }} · {{ motorcycle.kilometerstand|km }}</p>
   </div>
   <div class="detail-hero__media">
     {% if primary_image %}
@@ -28,7 +28,7 @@
 
 <div class="action-row mb-4">
   <a class="btn btn-primary" href="{{ url_for('main.service_new', motorrad_id=motorcycle.id) }}">Service</a>
-  <a class="btn btn-outline-secondary" href="{{ url_for('main.checklist_index', motorrad_id=motorcycle.id) }}">Service</a>
+  <a class="btn btn-outline-secondary" href="{{ url_for('main.checklist_index', motorrad_id=motorcycle.id) }}">Aufgabe</a>
   <button class="btn btn-outline-secondary" type="button" data-toggle-sheet>Datenblatt</button>
 </div>
 
@@ -39,7 +39,7 @@
   </div>
   <div>
     <span>Kosten</span>
-    <strong>{{ total_costs|number }} €</strong>
+    <strong>{{ total_costs|currency }}</strong>
   </div>
   <div>
     <span>Daten</span>
@@ -93,10 +93,10 @@
           <span class="history-row__title">{{ service.titel or "Service" }}</span>
           <span>
             {{ service.datum|date_de }}
-            {% if service.kilometerstand %} · {{ service.kilometerstand|number }} km{% endif %}
+            {% if service.kilometerstand %} · {{ service.kilometerstand|km }}{% endif %}
           </span>
           {% if service.kosten %}
-            <strong>{{ service.kosten|number }} €</strong>
+            <strong>{{ service.kosten|currency }}</strong>
           {% endif %}
         </a>
       {% endfor %}
@@ -113,8 +113,8 @@
           <span class="history-row__title">{{ checklist.titel }}</span>
           <span>
             {{ checklist.datum|date_de }}
-            {% if checklist.kilometerstand %} · {{ checklist.kilometerstand|number }} km{% endif %}
-            {% if checklist.intervall_km %} · {{ checklist.intervall_km|number }} km{% endif %}
+            {% if checklist.kilometerstand %} · {{ checklist.kilometerstand|km }}{% endif %}
+            {% if checklist.intervall_km %} · {{ checklist.intervall_km|km }}{% endif %}
           </span>
         </a>
       {% endfor %}

@@ -21,7 +21,7 @@
               <h3 class="h6 mb-1">{{ checklist.titel }}</h3>
               <p class="text-secondary mb-2">
                 Vorlage
-                {% if checklist.intervall_km %} · {{ checklist.intervall_km|number }} km{% endif %}
+                {% if checklist.intervall_km %} · {{ checklist.intervall_km|km }}{% endif %}
                 {% if checklist.intervall_monate %} · {{ checklist.intervall_monate|number }} Monate{% endif %}
                 · {{ checklist.items|length }} Prüfpunkte
               </p>
@@ -29,6 +29,7 @@
           </div>
           <div class="d-flex gap-2 flex-wrap">
             <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('main.checklist_edit', checklist_id=checklist.id) }}">Ausfüllen</a>
+            <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('main.checklist_template_edit', checklist_id=checklist.id) }}">Bearbeiten</a>
             <form method="post" action="{{ url_for('main.checklist_delete', checklist_id=checklist.id) }}" data-confirm="Diese Checkliste wirklich löschen?">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <button class="btn btn-sm btn-outline-danger" type="submit">Löschen</button>
@@ -53,8 +54,8 @@
               <h3 class="h6 mb-1">{{ checklist.titel }}</h3>
               <p class="text-secondary mb-2">
                 {{ checklist.datum|date_de }}
-                {% if checklist.kilometerstand %} · {{ checklist.kilometerstand|number }} km{% endif %}
-                {% if checklist.intervall_km %} · {{ checklist.intervall_km|number }} km{% endif %}
+                {% if checklist.kilometerstand %} · {{ checklist.kilometerstand|km }}{% endif %}
+                {% if checklist.intervall_km %} · {{ checklist.intervall_km|km }}{% endif %}
               </p>
             </div>
             <strong>{{ checklist.items|selectattr("erledigt")|list|length }}/{{ checklist.items|length }}</strong>

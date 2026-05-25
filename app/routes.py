@@ -21,6 +21,7 @@ from app.auth import admin_required
 from app.models import (
     AppSetting,
     Motorcycle,
+    MotorcycleDocument,
     MotorcycleImage,
     ServiceChecklist,
     ServiceChecklistItem,
@@ -46,9 +47,13 @@ bp = Blueprint("main", __name__)
 def require_motorcycle_ownership(motorcycle_id):
     """Verify current user owns the motorcycle."""
     motorcycle = Motorcycle.query.get_or_404(motorcycle_id)
-    if not current_user.is_admin and motorcycle.user_id != current_user.id:
+    if motorcycle.user_id != current_user.id:
         abort(403)
     return motorcycle
+
+
+def current_user_motorcycles_query():
+    return Motorcycle.query.filter_by(user_id=current_user.id)
 
 
 DEFAULT_CHECKLIST_CSV = "\n".join(
@@ -59,6 +64,15 @@ DEFAULT_CHECKLIST_CSV = "\n".join(
         "BMW R 1250 GS;Jahresservice;10000;12;3;Reifendruck pruefen;Herstellerangaben beachten",
     ]
 )
+
+DOCUMENT_CATEGORIES = [
+    "Fahrzeugschein",
+    "ABE",
+    "Gutachten",
+    "Versicherung",
+    "Rechnung",
+    "Sonstiges",
+]
 
 
 @bp.app_context_processor
@@ -74,6 +88,20 @@ def number_filter(value):
     if value in (None, ""):
         return "-"
     return f"{int(value):,}".replace(",", ".")
+
+
+@bp.app_template_filter("currency")
+def currency_filter(value):
+    if value in (None, ""):
+        return "-"
+    return f"{number_filter(value)} €"
+
+
+@bp.app_template_filter("km")
+def km_filter(value):
+    if value in (None, ""):
+        return "-"
+    return f"{number_filter(value)} km"
 
 
 @bp.app_template_filter("filesize")
@@ -107,7 +135,7 @@ def datetime_filter(value):
 @bp.route("/")
 @login_required
 def index():
-    query = Motorcycle.query if current_user.is_admin else Motorcycle.query.filter_by(user_id=current_user.id)
+    query = current_user_motorcycles_query()
     search = request.args.get("q", "").strip()
     sort = request.args.get("sort", "marke")
 
@@ -161,13 +189,68 @@ def privacy():
     return render_template("privacy.html")
 
 
+@bp.route("/dokumente", methods=["GET", "POST"])
+@login_required
+def documents():
+    motorcycles = current_user_motorcycles_query().order_by(Motorcycle.marke, Motorcycle.modell).all()
+    if request.method == "POST":
+        motorcycle = require_motorcycle_ownership(parse_int(request.form.get("motorrad_id")))
+        document_path, original_name = save_upload(request.files.get("document"), motorcycle.id, "documents")
+        if document_path:
+            title = request.form.get("titel", "").strip() or original_name or "Dokument"
+            category = request.form.get("kategorie") or "Sonstiges"
+            db.session.add(
+                MotorcycleDocument(
+                    user_id=current_user.id,
+                    motorrad_id=motorcycle.id,
+                    titel=title,
+                    kategorie=category,
+                    path=document_path,
+                    original_name=original_name,
+                )
+            )
+            db.session.commit()
+        return redirect(url_for("main.documents", motorrad_id=motorcycle.id))
+
+    selected_id = parse_int(request.args.get("motorrad_id"))
+    motorcycle = (
+        current_user_motorcycles_query().filter_by(id=selected_id).first()
+        if selected_id
+        else (motorcycles[0] if motorcycles else None)
+    )
+    documents = []
+    if motorcycle:
+        documents = (
+            MotorcycleDocument.query.filter_by(user_id=current_user.id, motorrad_id=motorcycle.id)
+            .order_by(MotorcycleDocument.created_at.desc(), MotorcycleDocument.id.desc())
+            .all()
+        )
+    return render_template(
+        "documents/index.html",
+        motorcycles=motorcycles,
+        motorcycle=motorcycle,
+        documents=documents,
+        document_categories=DOCUMENT_CATEGORIES,
+    )
+
+
+@bp.route("/dokumente/<int:document_id>/loeschen", methods=["POST"])
+@login_required
+def document_delete(document_id):
+    document = MotorcycleDocument.query.get_or_404(document_id)
+    if document.user_id != current_user.id:
+        abort(403)
+    motorrad_id = document.motorrad_id
+    delete_upload_file(document.path)
+    db.session.delete(document)
+    db.session.commit()
+    return redirect(url_for("main.documents", motorrad_id=motorrad_id))
+
+
 @bp.route("/checklisten/neu", methods=["GET", "POST"])
 @login_required
 def checklist_new_global():
-    motorcycles = (
-        Motorcycle.query if current_user.is_admin
-        else Motorcycle.query.filter_by(user_id=current_user.id)
-    ).order_by(Motorcycle.marke, Motorcycle.modell).all()
+    motorcycles = current_user_motorcycles_query().order_by(Motorcycle.marke, Motorcycle.modell).all()
     if request.method == "POST":
         imported = create_checklists_from_csv(request.files.get("csv_file"))
         if imported:
@@ -181,7 +264,11 @@ def checklist_new_global():
         return redirect(url_for("main.checklist_index", motorrad_id=checklist.motorrad_id))
 
     selected_id = parse_int(request.args.get("motorrad_id"))
-    selected_motorcycle = Motorcycle.query.get(selected_id) if selected_id else (motorcycles[0] if motorcycles else None)
+    selected_motorcycle = (
+        current_user_motorcycles_query().filter_by(id=selected_id).first()
+        if selected_id
+        else (motorcycles[0] if motorcycles else None)
+    )
     preset_key = request.args.get("preset", "")
     preset = SERVICE_CHECKLIST_PRESETS.get(preset_key, {})
     return render_template(
@@ -207,12 +294,13 @@ def checklist_csv_template():
 @bp.route("/technik", methods=["GET", "POST"])
 @login_required
 def technical_data_global():
-    motorcycles = (
-        Motorcycle.query if current_user.is_admin
-        else Motorcycle.query.filter_by(user_id=current_user.id)
-    ).order_by(Motorcycle.marke, Motorcycle.modell).all()
+    motorcycles = current_user_motorcycles_query().order_by(Motorcycle.marke, Motorcycle.modell).all()
     selected_id = parse_int(request.values.get("motorrad_id"))
-    motorcycle = Motorcycle.query.get(selected_id) if selected_id else (motorcycles[0] if motorcycles else None)
+    motorcycle = (
+        current_user_motorcycles_query().filter_by(id=selected_id).first()
+        if selected_id
+        else (motorcycles[0] if motorcycles else None)
+    )
 
     if request.method == "POST":
         motorrad_id = parse_int(request.form.get("motorrad_id"))
@@ -273,9 +361,8 @@ def motorcycle_detail(motorrad_id):
     ensure_motorcycle_mileage_is_current(motorcycle)
     gallery_images = ordered_motorcycle_images(motorcycle)
     primary_image = gallery_images[0] if gallery_images else None
-    owner_filter = {} if current_user.is_admin else {"user_id": current_user.id}
     services = (
-        ServiceEntry.query.filter_by(motorrad_id=motorrad_id, **owner_filter)
+        ServiceEntry.query.filter_by(motorrad_id=motorrad_id, user_id=current_user.id)
         .order_by(ServiceEntry.datum.desc(), ServiceEntry.id.desc())
         .all()
     )
@@ -284,18 +371,18 @@ def motorcycle_detail(motorrad_id):
         costs_by_category[entry.kategorie] = costs_by_category.get(entry.kategorie, 0) + (entry.kosten or 0)
     total_costs = sum(costs_by_category.values())
     technical_specs = (
-        TechnicalSpec.query.filter_by(motorrad_id=motorrad_id, **owner_filter)
+        TechnicalSpec.query.filter_by(motorrad_id=motorrad_id, user_id=current_user.id)
         .order_by(TechnicalSpec.kategorie, TechnicalSpec.name)
         .all()
     )
     checklist_templates = (
-        ServiceChecklist.query.filter_by(motorrad_id=motorrad_id, is_template=True, **owner_filter)
+        ServiceChecklist.query.filter_by(motorrad_id=motorrad_id, user_id=current_user.id, is_template=True)
         .order_by(ServiceChecklist.datum.desc().nullslast(), ServiceChecklist.id.desc())
         .limit(5)
         .all()
     )
     checklist_records = (
-        ServiceChecklist.query.filter_by(motorrad_id=motorrad_id, is_template=False, **owner_filter)
+        ServiceChecklist.query.filter_by(motorrad_id=motorrad_id, user_id=current_user.id, is_template=False)
         .order_by(ServiceChecklist.completed_at.desc().nullslast(), ServiceChecklist.id.desc())
         .limit(5)
         .all()
@@ -401,10 +488,7 @@ def technical_data(motorrad_id):
     return render_template(
         "motorcycles/technical.html",
         motorcycle=motorcycle,
-        motorcycles=(
-            Motorcycle.query if current_user.is_admin
-            else Motorcycle.query.filter_by(user_id=current_user.id)
-        ).order_by(Motorcycle.marke, Motorcycle.modell).all(),
+        motorcycles=current_user_motorcycles_query().order_by(Motorcycle.marke, Motorcycle.modell).all(),
         specs=specs,
         suggestions=suggestions,
     )
@@ -462,10 +546,7 @@ def checklist_new(motorrad_id):
     return render_template(
         "checklists/form.html",
         motorcycle=motorcycle,
-        motorcycles=(
-            Motorcycle.query if current_user.is_admin
-            else Motorcycle.query.filter_by(user_id=current_user.id)
-        ).order_by(Motorcycle.marke, Motorcycle.modell).all(),
+        motorcycles=current_user_motorcycles_query().order_by(Motorcycle.marke, Motorcycle.modell).all(),
         preset_key=preset_key,
         preset=preset,
         presets=SERVICE_CHECKLIST_PRESETS,
@@ -485,6 +566,31 @@ def checklist_edit(checklist_id):
         return redirect(url_for("main.checklist_edit", checklist_id=record.id))
 
     return render_template("checklists/edit.html", checklist=checklist, motorcycle=checklist.motorcycle)
+
+
+@bp.route("/checklisten/<int:checklist_id>/vorlage-bearbeiten", methods=["GET", "POST"])
+@login_required
+def checklist_template_edit(checklist_id):
+    checklist = ServiceChecklist.query.get_or_404(checklist_id)
+    require_motorcycle_ownership(checklist.motorrad_id)
+    if not checklist.is_template:
+        abort(409)
+
+    motorcycles = current_user_motorcycles_query().order_by(Motorcycle.marke, Motorcycle.modell).all()
+    if request.method == "POST":
+        update_checklist_from_form(checklist)
+        db.session.commit()
+        return redirect(url_for("main.checklist_index", motorrad_id=checklist.motorrad_id))
+
+    return render_template(
+        "checklists/form.html",
+        motorcycle=checklist.motorcycle,
+        motorcycles=motorcycles,
+        preset_key="",
+        preset={},
+        presets=SERVICE_CHECKLIST_PRESETS,
+        checklist=checklist,
+    )
 
 
 @bp.route("/checklisten/<int:checklist_id>/loeschen", methods=["POST"])
@@ -533,7 +639,7 @@ def service_new(motorrad_id):
 @login_required
 def service_edit(service_id):
     service = ServiceEntry.query.get_or_404(service_id)
-    if service.user_id != current_user.id and not current_user.is_admin:
+    if service.user_id != current_user.id:
         abort(403)
     motorcycle = service.motorcycle
     if request.method == "POST":
@@ -560,7 +666,7 @@ def service_edit(service_id):
 @login_required
 def service_delete(service_id):
     service = ServiceEntry.query.get_or_404(service_id)
-    if service.user_id != current_user.id and not current_user.is_admin:
+    if service.user_id != current_user.id:
         abort(403)
     motorrad_id = service.motorrad_id
     motorcycle = service.motorcycle
@@ -602,10 +708,7 @@ def api_motorcycles():
     if not current_user.is_authenticated:
         return jsonify([])
 
-    motorcycles = (
-        Motorcycle.query if current_user.is_admin
-        else Motorcycle.query.filter_by(user_id=current_user.id)
-    ).order_by(Motorcycle.marke, Motorcycle.modell).all()
+    motorcycles = current_user_motorcycles_query().order_by(Motorcycle.marke, Motorcycle.modell).all()
     return jsonify(
         [
             {
@@ -627,11 +730,10 @@ def api_services(motorrad_id):
         return jsonify([])
 
     motorcycle = Motorcycle.query.get_or_404(motorrad_id)
-    if not current_user.is_admin and motorcycle.user_id != current_user.id:
+    if motorcycle.user_id != current_user.id:
         abort(403)
 
-    owner_filter = {} if current_user.is_admin else {"user_id": current_user.id}
-    services = ServiceEntry.query.filter_by(motorrad_id=motorrad_id, **owner_filter).order_by(ServiceEntry.datum.desc()).all()
+    services = ServiceEntry.query.filter_by(motorrad_id=motorrad_id, user_id=current_user.id).order_by(ServiceEntry.datum.desc()).all()
     return jsonify([serialize_service(s) for s in services])
 
 
@@ -642,7 +744,7 @@ def api_create_service():
 
     data = request.get_json(force=True)
     motorcycle = Motorcycle.query.get_or_404(data.get("motorrad_id"))
-    if not current_user.is_admin and motorcycle.user_id != current_user.id:
+    if motorcycle.user_id != current_user.id:
         abort(403)
 
     service = ServiceEntry(
@@ -674,7 +776,7 @@ def api_sync():
     created = []
     for item in data.get("services", []):
         motorcycle = Motorcycle.query.get(item.get("motorrad_id"))
-        if not motorcycle or (not current_user.is_admin and motorcycle.user_id != current_user.id):
+        if not motorcycle or motorcycle.user_id != current_user.id:
             continue
         service = ServiceEntry(
             motorrad_id=motorcycle.id,
@@ -698,7 +800,7 @@ def api_sync():
         motorcycle = Motorcycle.query.get(item.get("motorrad_id"))
         if not template or not motorcycle or template.motorrad_id != motorcycle.id:
             continue
-        if not current_user.is_admin and motorcycle.user_id != current_user.id:
+        if motorcycle.user_id != current_user.id:
             continue
         service = ServiceEntry(
             motorrad_id=motorcycle.id,
@@ -885,7 +987,7 @@ def find_motorcycle_for_checklist_row(row):
     motorrad_id = parse_int(row.get("motorrad_id"))
     if motorrad_id:
         motorcycle = Motorcycle.query.get(motorrad_id)
-        if motorcycle and current_user.is_authenticated and not current_user.is_admin:
+        if motorcycle and current_user.is_authenticated:
             return motorcycle if motorcycle.user_id == current_user.id else None
         return motorcycle
 
@@ -893,7 +995,7 @@ def find_motorcycle_for_checklist_row(row):
     if not label:
         return None
     query = Motorcycle.query
-    if current_user.is_authenticated and not current_user.is_admin:
+    if current_user.is_authenticated:
         query = query.filter_by(user_id=current_user.id)
     motorcycles = query.all()
     for motorcycle in motorcycles:
@@ -988,6 +1090,36 @@ def create_checklist_from_form(motorcycle):
             )
         )
     return checklist
+
+
+def update_checklist_from_form(checklist):
+    checklist.titel = request.form.get("titel") or checklist.titel or "Service-Checkliste"
+    checklist.intervall_km = parse_int(request.form.get("intervall_km"))
+    checklist.intervall_monate = parse_int(request.form.get("intervall_monate"))
+    checklist.datum = parse_date(request.form.get("datum"))
+    checklist.kilometerstand = parse_int(request.form.get("kilometerstand"))
+    checklist.anmerkungen = request.form.get("anmerkungen")
+
+    ServiceChecklistItem.query.filter_by(checklist_id=checklist.id).delete()
+    item_texts = request.form.getlist("item_text")
+    item_comments = request.form.getlist("item_comment")
+    rows = []
+    for index, text in enumerate(item_texts):
+        text = text.strip()
+        comment = item_comments[index].strip() if index < len(item_comments) else ""
+        if not text and not comment:
+            continue
+        rows.append((text or "Prüfpunkt", comment))
+
+    for position, (text, comment) in enumerate(rows, start=1):
+        db.session.add(
+            ServiceChecklistItem(
+                checklist_id=checklist.id,
+                position=position,
+                text=text or "Prüfpunkt",
+                kommentar_vorlage=comment,
+            )
+        )
 
 
 def create_checklist_record_from_template(template):

@@ -34,6 +34,10 @@ document.querySelector("[data-technical-motorcycle-select]")?.addEventListener("
   window.location.href = `/technik?motorrad_id=${event.target.value}`;
 });
 
+document.querySelector("[data-document-motorcycle-select]")?.addEventListener("change", (event) => {
+  window.location.href = `/dokumente?motorrad_id=${event.target.value}`;
+});
+
 document.querySelector("[data-service-type]")?.addEventListener("change", (event) => {
   const value = event.target.value;
   const checklistId = value.startsWith("checklist:") ? value.split(":")[1] : null;
@@ -167,11 +171,15 @@ function normalizeNumberInput(input) {
     input.value = "";
     return;
   }
-  input.value = Number(raw).toLocaleString("de-DE");
+  const suffix = input.dataset.numberSuffix ? ` ${input.dataset.numberSuffix}` : "";
+  input.value = `${Number(raw).toLocaleString("de-DE")}${suffix}`;
 }
 
 document.querySelectorAll(".number-input").forEach((input) => {
   normalizeNumberInput(input);
+  input.addEventListener("focus", () => {
+    input.value = input.value.replace(/[^\d]/g, "");
+  });
   input.addEventListener("blur", () => normalizeNumberInput(input));
 });
 

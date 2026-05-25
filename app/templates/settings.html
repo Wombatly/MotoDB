@@ -1,10 +1,10 @@
 {% extends "base.html" %}
-{% block title %}Einstellungen{% endblock %}
+{% block title %}Profil · Einstellungen{% endblock %}
 
 {% block content %}
 <div class="d-flex align-items-start justify-content-between gap-3 mb-3">
   <div>
-    <h1 class="h3 mb-1">Einstellungen</h1>
+    <h1 class="h3 mb-1">Profil</h1>
   </div>
 </div>
 
@@ -35,6 +35,13 @@
         <path d="M14 11v5"></path>
       </svg>
     </a>
+    {% if current_user.is_admin %}
+      <a class="btn btn-outline-secondary" href="{{ url_for('auth.admin_users') }}">Nutzerverwaltung</a>
+    {% endif %}
+    <form method="post" action="{{ url_for('auth.logout') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="btn btn-outline-secondary" type="submit">Abmelden</button>
+    </form>
   </div>
   <p class="mb-0 mt-3">
     <a href="{{ url_for('main.privacy') }}">Datenschutzhinweise</a>

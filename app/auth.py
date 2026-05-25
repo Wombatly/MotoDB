@@ -11,7 +11,7 @@ from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.utils import secure_filename
 
 from app import db
-from app.models import User, Motorcycle, MotorcycleImage, ServiceEntry, TechnicalSpec, ServiceChecklist
+from app.models import User, Motorcycle, MotorcycleDocument, MotorcycleImage, ServiceEntry, TechnicalSpec, ServiceChecklist
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -270,6 +270,31 @@ def user_export():
                     }
                 )
 
+            documents = (
+                MotorcycleDocument.query.filter_by(user_id=current_user.id, motorrad_id=motorcycle.id)
+                .order_by(MotorcycleDocument.created_at, MotorcycleDocument.id)
+                .all()
+            )
+            document_entries = []
+            for document in documents:
+                document_archive = write_export_file(
+                    zf,
+                    upload_root,
+                    document.path,
+                    folder_path / 'dokumente',
+                )
+                document_entries.append(
+                    {
+                        'id': document.id,
+                        'titel': document.titel,
+                        'kategorie': document.kategorie,
+                        'original_name': document.original_name,
+                        'datei': document_archive,
+                        'created_at': document.created_at.isoformat(),
+                        'updated_at': document.updated_at.isoformat(),
+                    }
+                )
+
             specs = (
                 TechnicalSpec.query.filter_by(user_id=current_user.id, motorrad_id=motorcycle.id)
                 .order_by(TechnicalSpec.kategorie, TechnicalSpec.name)
@@ -349,6 +374,7 @@ def user_export():
                     'updated_at': motorcycle.updated_at.isoformat(),
                 },
                 'bilder': image_entries,
+                'dokumente': document_entries,
                 'services': service_entries,
                 'technische_daten': spec_entries,
                 'checklisten': checklist_entries,
@@ -397,7 +423,9 @@ def admin_users():
     users = User.query.order_by(User.username, User.email).all()
     stats = {
         "users": len(users),
-        "motorcycles": sum(len(user.motorcycles) for user in users),
+        "motorcycles": Motorcycle.query.count(),
+        "services": ServiceEntry.query.count(),
+        "checklists": ServiceChecklist.query.count(),
         "admins": sum(1 for user in users if user.is_admin),
     }
     disk_usage = None

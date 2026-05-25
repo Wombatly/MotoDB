@@ -30,16 +30,10 @@
               <div class="image-manager__actions">
                 {% if image.path == motorcycle.bild %}
                   <span class="image-manager__primary-indicator" aria-label="Aktuelles Titelbild">
-                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                      <path d="M20 6L9 17l-5-5"></path>
-                    </svg>
                     Titelbild
                   </span>
                 {% else %}
                   <button class="btn btn-outline-secondary image-manager__primary-button" type="submit" form="make-primary-image-{{ image.id }}">
-                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                      <path d="M20 6L9 17l-5-5"></path>
-                    </svg>
                     Als Titelbild
                   </button>
                 {% endif %}
@@ -112,7 +106,7 @@
     </div>
     <div class="col-12 col-md-4">
       <label class="form-label" for="kaufpreis">Kaufpreis</label>
-      <input class="form-control number-input" id="kaufpreis" name="kaufpreis" inputmode="numeric" value="{{ motorcycle.kaufpreis or '' }}">
+      <input class="form-control number-input" id="kaufpreis" name="kaufpreis" inputmode="numeric" data-number-suffix="€" value="{{ motorcycle.kaufpreis or '' }}">
     </div>
     <div class="col-12 col-md-4">
       <label class="form-label" for="erstzulassung">Erstzulassung</label>
@@ -124,7 +118,7 @@
     </div>
     <div class="col-12 col-md-4">
       <label class="form-label" for="verkaufspreis">Verkaufspreis</label>
-      <input class="form-control number-input" id="verkaufspreis" name="verkaufspreis" inputmode="numeric" value="{{ motorcycle.verkaufspreis or '' }}">
+      <input class="form-control number-input" id="verkaufspreis" name="verkaufspreis" inputmode="numeric" data-number-suffix="€" value="{{ motorcycle.verkaufspreis or '' }}">
     </div>
     <div class="col-12">
       <label class="form-label" for="notizen">Notizen</label>

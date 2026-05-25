@@ -21,7 +21,7 @@
     </div>
     <div>
       <span>Gesamt km</span>
-      <strong>{{ garage_total_km|number }}</strong>
+      <strong>{{ garage_total_km|km }}</strong>
     </div>
   </section>
   <div class="motorcycle-grid">
@@ -41,7 +41,7 @@
             <div class="motorcycle-card__model">{{ motorcycle.modell }}</div>
             <div class="motorcycle-card__meta">
               <span>{{ motorcycle.baujahr or "Baujahr offen" }}</span>
-              <span>{{ motorcycle.kilometerstand|number }} km</span>
+              <span>{{ motorcycle.kilometerstand|km }}</span>
             </div>
           </div>
         </a>

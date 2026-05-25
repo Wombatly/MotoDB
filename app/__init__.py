@@ -157,12 +157,27 @@ def ensure_schema_updates():
             )
             """
         )
+        connection.exec_driver_sql(
+            """
+            CREATE TABLE IF NOT EXISTS motorcycle_document (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL REFERENCES user(id),
+                motorrad_id INTEGER NOT NULL REFERENCES motorcycle(id),
+                titel VARCHAR(160) NOT NULL,
+                kategorie VARCHAR(80) NOT NULL,
+                path VARCHAR(255) NOT NULL,
+                original_name VARCHAR(255),
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
 
         admin_id = connection.exec_driver_sql(
             "SELECT id FROM user WHERE is_admin = 1 ORDER BY id LIMIT 1"
         ).scalar()
 
-        for table_name in ['motorcycle', 'service_entry', 'technical_spec', 'service_checklist']:
+        for table_name in ['motorcycle', 'service_entry', 'technical_spec', 'service_checklist', 'motorcycle_document']:
             columns = {
                 row[1]
                 for row in connection.exec_driver_sql(f"PRAGMA table_info({table_name})")
