@@ -61,18 +61,16 @@
 {% endif %}
 
 <section class="form-panel mt-3">
-  <h2 class="h5 mb-3">Service-Checklisten</h2>
+  <h2 class="h5 mb-3">Vorlagen</h2>
   <div class="d-flex gap-2">
-    <a class="btn btn-outline-secondary" href="{{ url_for('main.checklist_new_global') }}">Checkliste anlegen</a>
     <a class="btn btn-outline-secondary" href="{{ url_for('main.checklist_csv_template') }}">Checklisten-Vorlage</a>
+    <a class="btn btn-outline-secondary" href="{{ url_for('main.technical_csv_template') }}">Datenblatt-Vorlage</a>
   </div>
 </section>
 
 <section class="form-panel mt-3">
-  <h2 class="h5 mb-3">Datenblätter</h2>
-  <div class="d-flex gap-2">
-    <a class="btn btn-outline-secondary" href="{{ url_for('main.technical_data_global') }}">Technische Daten</a>
-    <a class="btn btn-outline-secondary" href="{{ url_for('main.technical_csv_template') }}">Datenblatt-Vorlage</a>
-  </div>
+  <h2 class="h5 mb-3">Datenblatt-Upload</h2>
+  <p class="text-secondary mb-3">Technische Daten einlesen oder bearbeiten.</p>
+  <a class="btn btn-outline-secondary" href="{{ url_for('main.technical_data_global') }}">Datenblatt öffnen</a>
 </section>
 {% endblock %}
