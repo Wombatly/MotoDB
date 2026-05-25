@@ -104,6 +104,16 @@ def km_filter(value):
     return f"{number_filter(value)} km"
 
 
+@bp.app_template_filter("checklist_interval")
+def checklist_interval_filter(checklist):
+    parts = []
+    if checklist.intervall_km:
+        parts.append(km_filter(checklist.intervall_km))
+    if checklist.intervall_monate:
+        parts.append(f"{number_filter(checklist.intervall_monate)} Monate")
+    return " / ".join(parts) if parts else "Ohne Intervall"
+
+
 @bp.app_template_filter("filesize")
 def filesize_filter(value):
     if value in (None, ""):
@@ -611,7 +621,12 @@ def service_new(motorrad_id):
     service = ServiceEntry(motorrad_id=motorrad_id, datum=date.today(), user_id=current_user.id)
     checklist_templates = (
         ServiceChecklist.query.filter_by(motorrad_id=motorrad_id, user_id=current_user.id, is_template=True)
-        .order_by(ServiceChecklist.titel)
+        .order_by(
+            ServiceChecklist.intervall_km.asc().nullslast(),
+            ServiceChecklist.intervall_monate.asc().nullslast(),
+            ServiceChecklist.titel,
+            ServiceChecklist.id,
+        )
         .all()
     )
     if request.method == "POST":
@@ -631,6 +646,7 @@ def service_new(motorrad_id):
         service=service,
         categories=CATEGORIES,
         checklist_templates=checklist_templates,
+        checklist_template_groups=group_checklists_by_interval(checklist_templates),
         title="Service eintragen",
     )
 
@@ -983,6 +999,18 @@ def split_lines(text):
     return [line.strip().strip("-") for line in (text or "").splitlines() if line.strip().strip("-")]
 
 
+def group_checklists_by_interval(checklists):
+    groups = []
+    labels = {}
+    for checklist in checklists:
+        label = checklist_interval_filter(checklist)
+        if label not in labels:
+            labels[label] = {"label": label, "checklists": []}
+            groups.append(labels[label])
+        labels[label]["checklists"].append(checklist)
+    return groups
+
+
 def find_motorcycle_for_checklist_row(row):
     motorrad_id = parse_int(row.get("motorrad_id"))
     if motorrad_id:
@@ -1012,14 +1040,16 @@ def create_checklists_from_csv(file_storage):
         motorcycle = find_motorcycle_for_checklist_row(row)
         if not motorcycle:
             continue
-        key = (motorcycle.id, row["titel"])
+        interval_km = parse_int(row.get("intervall_km"))
+        interval_months = parse_int(row.get("intervall_monate"))
+        key = (motorcycle.id, row["titel"], interval_km, interval_months)
         grouped.setdefault(
             key,
             {
                 "motorcycle": motorcycle,
                 "titel": row["titel"],
-                "intervall_km": parse_int(row.get("intervall_km")),
-                "intervall_monate": parse_int(row.get("intervall_monate")),
+                "intervall_km": interval_km,
+                "intervall_monate": interval_months,
                 "items": [],
             },
         )

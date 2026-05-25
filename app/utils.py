@@ -141,7 +141,8 @@ def parse_date(value):
 def parse_int(value):
     if value in (None, ""):
         return None
-    return int(str(value).replace(".", "").replace(",", "").replace(" ", ""))
+    digits = "".join(character for character in str(value) if character.isdigit())
+    return int(digits) if digits else None
 
 
 def parse_technical_import(text):
@@ -239,13 +240,89 @@ def parse_checklist_csv(file_storage):
             (key or "").strip().lower().replace("_", "").replace("-", ""): (value or "").strip()
             for key, value in line.items()
         }
-        title = normalized.get("titel") or normalized.get("title")
+        raw_interval = (
+            normalized.get("intervall")
+            or normalized.get("interval")
+            or normalized.get("wartungsintervall")
+            or normalized.get("serviceintervall")
+        )
+        raw_km = (
+            normalized.get("km")
+            or normalized.get("intervallkm")
+            or normalized.get("kilometer")
+            or normalized.get("kilometerintervall")
+        )
+        raw_months = normalized.get("monate") or normalized.get("intervallmonate")
+        intervall_km = raw_km
+        intervall_monate = raw_months
+        if raw_interval and raw_km and not raw_months:
+            intervall_monate = raw_interval
+        elif raw_interval and not raw_km and not raw_months:
+            lowered_interval = raw_interval.lower()
+            if "km" in lowered_interval or "kilometer" in lowered_interval:
+                intervall_km = raw_interval
+            elif "jahr" in lowered_interval:
+                parsed_years = parse_int(raw_interval)
+                intervall_monate = str(parsed_years * 12) if parsed_years else raw_interval
+            else:
+                intervall_monate = raw_interval
+
+        title = (
+            normalized.get("titel")
+            or normalized.get("title")
+            or normalized.get("checkliste")
+            or normalized.get("service")
+            or raw_interval
+            or raw_km
+            or "Service-Checkliste"
+        )
         item_text = (
             normalized.get("pruefpunkt")
             or normalized.get("prüfpunkt")
             or normalized.get("punkt")
+            or normalized.get("checkpunkt")
+            or normalized.get("kontrollpunkt")
             or normalized.get("item")
+            or normalized.get("aufgabe")
+            or normalized.get("arbeit")
+            or normalized.get("arbeiten")
+            or normalized.get("taetigkeit")
+            or normalized.get("tätigkeit")
+            or normalized.get("beschreibung")
+            or normalized.get("text")
+            or normalized.get("name")
         )
+        if not item_text:
+            ignored_keys = {
+                "motorrad",
+                "motorcycle",
+                "motorradid",
+                "motorcycleid",
+                "titel",
+                "title",
+                "checkliste",
+                "service",
+                "intervall",
+                "interval",
+                "wartungsintervall",
+                "serviceintervall",
+                "km",
+                "intervallkm",
+                "kilometer",
+                "kilometerintervall",
+                "monate",
+                "intervallmonate",
+                "position",
+                "pos",
+                "kommentar",
+                "comment",
+            }
+            fallback_values = [
+                value
+                for key, value in normalized.items()
+                if key not in ignored_keys and value
+            ]
+            item_text = fallback_values[0] if fallback_values else ""
         if not title or not item_text:
             continue
         rows.append(
@@ -253,8 +330,8 @@ def parse_checklist_csv(file_storage):
                 "motorrad": normalized.get("motorrad") or normalized.get("motorcycle"),
                 "motorrad_id": normalized.get("motorradid") or normalized.get("motorcycleid"),
                 "titel": title,
-                "intervall_km": normalized.get("km") or normalized.get("intervallkm"),
-                "intervall_monate": normalized.get("intervall") or normalized.get("monate"),
+                "intervall_km": intervall_km,
+                "intervall_monate": intervall_monate,
                 "position": normalized.get("position") or normalized.get("pos"),
                 "text": item_text,
                 "kommentar": normalized.get("kommentar") or normalized.get("comment"),

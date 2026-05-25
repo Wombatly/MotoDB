@@ -212,6 +212,56 @@ class SecurityTestCase(unittest.TestCase):
             self.assertIn(b"Checklisten", users_response.data)
             self.assertIn(b"Speicherplatz", users_response.data)
 
+    def test_csv_checklists_are_grouped_by_interval_in_service_form(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            app = self.build_app(tempdir)
+            app.config.update(WTF_CSRF_ENABLED=False)
+            with app.app_context():
+                user = User(username="rider", email="rider@example.com")
+                user.set_password("rider-password")
+                db.session.add(user)
+                db.session.flush()
+                motorcycle = Motorcycle(user_id=user.id, marke="BMW", modell="R80")
+                db.session.add(motorcycle)
+                db.session.commit()
+                user_id = user.id
+                motorcycle_id = motorcycle.id
+
+            client = app.test_client()
+            with client.session_transaction() as session:
+                session["_user_id"] = str(user_id)
+                session["_fresh"] = True
+
+            csv_text = "\n".join(
+                [
+                    "Motorrad;Titel;km;Intervall;Position;Pruefpunkt;Kommentar",
+                    "BMW R80;Service;10000;12;1;Oelstand pruefen;Motor warm",
+                    "BMW R80;Service;10000;12;2;Bremsen pruefen;",
+                    "BMW R80;Service;20000;24;1;Ventilspiel pruefen;",
+                ]
+            )
+            import_response = client.post(
+                f"/motorrad/{motorcycle_id}/checklisten/neu",
+                data={"csv_file": (BytesIO(csv_text.encode("utf-8")), "checklisten.csv")},
+                content_type="multipart/form-data",
+            )
+
+            self.assertEqual(import_response.status_code, 302)
+            with app.app_context():
+                checklists = ServiceChecklist.query.order_by(ServiceChecklist.intervall_km).all()
+                self.assertEqual(len(checklists), 2)
+                self.assertEqual([checklist.intervall_km for checklist in checklists], [10000, 20000])
+                self.assertEqual([len(checklist.items) for checklist in checklists], [2, 1])
+
+            service_response = client.get(f"/motorrad/{motorcycle_id}/service/neu")
+            self.assertEqual(service_response.status_code, 200)
+            self.assertIn("10.000 km / 12 Monate".encode("utf-8"), service_response.data)
+            self.assertIn("20.000 km / 24 Monate".encode("utf-8"), service_response.data)
+            self.assertIn(b'type="checkbox"', service_response.data)
+            self.assertIn(b"checklist_erledigt_", service_response.data)
+            self.assertIn("Oelstand pruefen".encode("utf-8"), service_response.data)
+            self.assertIn("Ventilspiel pruefen".encode("utf-8"), service_response.data)
+
     def test_admin_can_delete_user_data_and_uploads(self):
         with tempfile.TemporaryDirectory() as tempdir:
             app = self.build_app(tempdir)

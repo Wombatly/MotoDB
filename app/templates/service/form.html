@@ -18,8 +18,14 @@
         <label class="form-label" for="service_art">Art</label>
         <select class="form-select" id="service_art" name="service_art" data-service-type>
           <option value="free">Freier Service</option>
-          {% for checklist in checklist_templates %}
-            <option value="checklist:{{ checklist.id }}">{{ checklist.titel }}</option>
+          {% for group in checklist_template_groups %}
+            <optgroup label="{{ group.label }}">
+              {% for checklist in group.checklists %}
+                <option value="checklist:{{ checklist.id }}">
+                  {{ checklist.titel }} · {{ checklist|checklist_interval }} · {{ checklist.items|length }} Prüfpunkte
+                </option>
+              {% endfor %}
+            </optgroup>
           {% endfor %}
         </select>
       </div>
@@ -58,6 +64,7 @@
       {% for checklist in checklist_templates %}
         <section class="service-checklist" data-service-checklist="{{ checklist.id }}" hidden>
           <h2 class="h5 mt-4 mb-3">{{ checklist.titel }}</h2>
+          <p class="text-secondary mb-3">{{ checklist|checklist_interval }} · {{ checklist.items|length }} Prüfpunkte</p>
           <div class="checklist-items">
             {% for item in checklist.items %}
               <div class="checklist-item">
