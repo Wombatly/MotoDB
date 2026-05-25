@@ -59,10 +59,10 @@ def current_user_motorcycles_query():
 
 DEFAULT_CHECKLIST_CSV = "\n".join(
     [
-        "Motorrad;Titel;km;Intervall;Position;Pruefpunkt;Kommentar",
-        "BMW R 1250 GS;Jahresservice;10000;12;1;Oelstand pruefen;Motor warmfahren und auf ebenem Untergrund pruefen",
-        "BMW R 1250 GS;Jahresservice;10000;12;2;Bremsbelaege pruefen;Vorne und hinten Sichtpruefung durchfuehren",
-        "BMW R 1250 GS;Jahresservice;10000;12;3;Reifendruck pruefen;Herstellerangaben beachten",
+        "Pruefpunkt;Kommentar",
+        "Oelstand pruefen;Motor warmfahren und auf ebenem Untergrund pruefen",
+        "Bremsbelaege pruefen;Vorne und hinten Sichtpruefung durchfuehren",
+        "Reifendruck pruefen;Herstellerangaben beachten",
     ]
 )
 

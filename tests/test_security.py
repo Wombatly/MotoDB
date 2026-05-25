@@ -222,6 +222,33 @@ class SecurityTestCase(unittest.TestCase):
             self.assertIn(b"Checklisten", users_response.data)
             self.assertIn(b"Speicherplatz", users_response.data)
 
+    def test_template_downloads_match_current_upload_formats(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            app = self.build_app(tempdir)
+            with app.app_context():
+                user = User(username="rider", email="rider@example.com")
+                user.set_password("rider-password")
+                db.session.add(user)
+                db.session.commit()
+                user_id = user.id
+
+            client = app.test_client()
+            with client.session_transaction() as session:
+                session["_user_id"] = str(user_id)
+                session["_fresh"] = True
+
+            checklist_response = client.get("/checklisten/csv-vorlage")
+            technical_response = client.get("/technik/csv-vorlage")
+
+            self.assertEqual(checklist_response.status_code, 200)
+            self.assertIn(b"Pruefpunkt;Kommentar", checklist_response.data)
+            self.assertIn(b"Oelstand pruefen;", checklist_response.data)
+            self.assertNotIn(b"Motorrad;Titel;km;Intervall", checklist_response.data)
+
+            self.assertEqual(technical_response.status_code, 200)
+            self.assertIn(b"Kategorie;Eintrag;Wert;Einheit;Quelle", technical_response.data)
+            self.assertIn(b"Motor;Hubraum;583;ccm;Fahrzeugschein", technical_response.data)
+
     def test_csv_checklists_are_grouped_by_interval_in_service_form(self):
         with tempfile.TemporaryDirectory() as tempdir:
             app = self.build_app(tempdir)
