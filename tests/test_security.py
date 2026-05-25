@@ -262,6 +262,53 @@ class SecurityTestCase(unittest.TestCase):
             self.assertIn("Oelstand pruefen".encode("utf-8"), service_response.data)
             self.assertIn("Ventilspiel pruefen".encode("utf-8"), service_response.data)
 
+    def test_checklist_form_adds_points_from_uploaded_list(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            app = self.build_app(tempdir)
+            app.config.update(WTF_CSRF_ENABLED=False)
+            with app.app_context():
+                user = User(username="rider", email="rider@example.com")
+                user.set_password("rider-password")
+                db.session.add(user)
+                db.session.flush()
+                motorcycle = Motorcycle(user_id=user.id, marke="BMW", modell="R80")
+                db.session.add(motorcycle)
+                db.session.commit()
+                user_id = user.id
+                motorcycle_id = motorcycle.id
+
+            client = app.test_client()
+            with client.session_transaction() as session:
+                session["_user_id"] = str(user_id)
+                session["_fresh"] = True
+
+            form_response = client.get(f"/motorrad/{motorcycle_id}/checklisten/neu")
+            self.assertEqual(form_response.status_code, 200)
+            self.assertEqual(form_response.data.count(b'name="item_text"'), 2)
+            self.assertIn(b"data-add-checklist-item", form_response.data)
+            self.assertIn(b"item_list_file", form_response.data)
+
+            item_list = "\n".join(["Oelstand pruefen", "- Bremsen pruefen", "3. Kette schmieren"])
+            create_response = client.post(
+                f"/motorrad/{motorcycle_id}/checklisten/neu",
+                data={
+                    "motorrad_id": str(motorcycle_id),
+                    "titel": "Importierte Punkteliste",
+                    "item_list_file": (BytesIO(item_list.encode("utf-8")), "punkte.txt"),
+                },
+                content_type="multipart/form-data",
+            )
+
+            self.assertEqual(create_response.status_code, 302)
+            with app.app_context():
+                checklist = ServiceChecklist.query.one()
+                self.assertEqual(checklist.titel, "Importierte Punkteliste")
+                self.assertEqual([item.text for item in checklist.items], [
+                    "Oelstand pruefen",
+                    "Bremsen pruefen",
+                    "Kette schmieren",
+                ])
+
     def test_admin_can_delete_user_data_and_uploads(self):
         with tempfile.TemporaryDirectory() as tempdir:
             app = self.build_app(tempdir)

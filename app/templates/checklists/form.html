@@ -52,7 +52,7 @@
   {% endif %}
 
   <h2 class="h5 mt-4 mb-3">Prüfpunkte</h2>
-  <div class="checklist-builder">
+  <div class="checklist-builder" data-checklist-builder>
     {% set existing_items = checklist.items if checklist else [] %}
     {% for item in existing_items %}
       <div class="checklist-builder-row">
@@ -80,7 +80,7 @@
       </div>
     {% endfor %}
     {% set existing_count = existing_items|length + preset_items|length %}
-    {% for _ in range(10 - existing_count if existing_count < 10 else 3) %}
+    {% for _ in range(1 if existing_count == 0 else 0) %}
       <div class="checklist-builder-row">
         <div>
           <label class="form-label">Prüfpunkt</label>
@@ -92,6 +92,27 @@
         </div>
       </div>
     {% endfor %}
+  </div>
+  <template data-checklist-row-template>
+    <div class="checklist-builder-row">
+      <div>
+        <label class="form-label">Prüfpunkt</label>
+        <input class="form-control" name="item_text" value="">
+      </div>
+      <div>
+        <label class="form-label">Kommentar</label>
+        <textarea class="form-control" name="item_comment" rows="2"></textarea>
+      </div>
+    </div>
+  </template>
+  <div class="d-flex gap-2 mt-3">
+    <button class="btn btn-outline-secondary" type="button" data-add-checklist-item>Punkt hinzufügen</button>
+  </div>
+
+  <div class="import-panel mt-4">
+    <h2 class="h5 mb-2">Punkteliste hochladen</h2>
+    <p class="text-secondary mb-2">Geeignet sind CSV, TXT oder Markdown mit einem Prüfpunkt pro Zeile. Text-PDFs werden ebenfalls gelesen.</p>
+    <input class="form-control" id="item_list_file" name="item_list_file" type="file" accept=".csv,text/csv,.txt,text/plain,.md,text/markdown,.pdf,application/pdf">
   </div>
 
   <div class="row g-3">

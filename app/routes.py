@@ -34,6 +34,7 @@ from app.utils import (
     TECHNICAL_SPEC_SUGGESTIONS,
     parse_date,
     parse_checklist_csv,
+    parse_checklist_item_file,
     parse_int,
     parse_technical_csv,
     parse_technical_import,
@@ -1109,6 +1110,8 @@ def create_checklist_from_form(motorcycle):
 
     if not rows and preset:
         rows = [(item, "") for item in preset.get("items", [])]
+
+    rows.extend(parse_checklist_item_file(request.files.get("item_list_file")))
 
     for position, (text, comment) in enumerate(rows, start=1):
         db.session.add(

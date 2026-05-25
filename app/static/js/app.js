@@ -56,6 +56,15 @@ document.querySelector("[data-toggle-sheet]")?.addEventListener("click", () => {
   sheet.toggleAttribute("hidden");
 });
 
+document.querySelector("[data-add-checklist-item]")?.addEventListener("click", () => {
+  const builder = document.querySelector("[data-checklist-builder]");
+  const template = document.querySelector("[data-checklist-row-template]");
+  if (!builder || !template) return;
+  const row = template.content.firstElementChild.cloneNode(true);
+  builder.append(row);
+  row.querySelector("input, textarea")?.focus();
+});
+
 document.querySelectorAll("[data-sheet] .spec-group").forEach((group) => {
   group.removeAttribute("open");
 });

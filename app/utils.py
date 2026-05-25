@@ -3,6 +3,7 @@ import csv
 import io
 import json
 from pathlib import Path
+import re
 from uuid import uuid4
 
 from flask import current_app
@@ -338,6 +339,132 @@ def parse_checklist_csv(file_storage):
             }
         )
     return rows
+
+
+def parse_checklist_item_file(file_storage):
+    if not file_storage or not file_storage.filename:
+        return []
+
+    raw = file_storage.read()
+    if not raw:
+        return []
+
+    extension = Path(file_storage.filename).suffix.lower()
+    if extension == ".pdf":
+        text = extract_pdf_text(raw)
+    else:
+        text = raw.decode("utf-8-sig", errors="ignore")
+
+    if not text.strip():
+        return []
+    return parse_checklist_item_text(text, extension)
+
+
+def extract_pdf_text(raw):
+    try:
+        from pypdf import PdfReader
+    except ImportError:
+        return ""
+
+    try:
+        reader = PdfReader(io.BytesIO(raw))
+    except Exception:
+        return ""
+
+    page_text = []
+    for page in reader.pages:
+        try:
+            page_text.append(page.extract_text() or "")
+        except Exception:
+            continue
+    return "\n".join(page_text)
+
+
+def parse_checklist_item_text(text, extension=""):
+    if extension == ".csv":
+        rows = parse_checklist_item_csv(text)
+        if rows:
+            return rows
+
+    rows = []
+    for line in text.splitlines():
+        point = clean_checklist_item_line(line)
+        if point:
+            rows.append((point, ""))
+    return rows
+
+
+def parse_checklist_item_csv(text):
+    sample = text[:1024]
+    delimiter = ";" if sample.count(";") > sample.count(",") else ","
+    raw_rows = list(csv.reader(io.StringIO(text), delimiter=delimiter))
+    raw_rows = [[cell.strip() for cell in row] for row in raw_rows if any(cell.strip() for cell in row)]
+    if not raw_rows:
+        return []
+
+    header_keys = {
+        cell.lower().replace("_", "").replace("-", "")
+        for cell in raw_rows[0]
+    }
+    known_headers = {
+        "pruefpunkt",
+        "prüfpunkt",
+        "punkt",
+        "checkpunkt",
+        "kontrollpunkt",
+        "aufgabe",
+        "arbeit",
+        "arbeiten",
+        "taetigkeit",
+        "tätigkeit",
+        "beschreibung",
+        "text",
+        "name",
+        "kommentar",
+        "comment",
+    }
+    if header_keys & known_headers:
+        reader = csv.DictReader(io.StringIO(text), delimiter=delimiter)
+        rows = []
+        for line in reader:
+            normalized = {
+                (key or "").strip().lower().replace("_", "").replace("-", ""): (value or "").strip()
+                for key, value in line.items()
+            }
+            point = (
+                normalized.get("pruefpunkt")
+                or normalized.get("prüfpunkt")
+                or normalized.get("punkt")
+                or normalized.get("checkpunkt")
+                or normalized.get("kontrollpunkt")
+                or normalized.get("aufgabe")
+                or normalized.get("arbeit")
+                or normalized.get("arbeiten")
+                or normalized.get("taetigkeit")
+                or normalized.get("tätigkeit")
+                or normalized.get("beschreibung")
+                or normalized.get("text")
+                or normalized.get("name")
+            )
+            comment = normalized.get("kommentar") or normalized.get("comment") or ""
+            point = clean_checklist_item_line(point or "")
+            if point or comment:
+                rows.append((point or "Prüfpunkt", comment))
+        return rows
+
+    rows = []
+    for row in raw_rows:
+        point = clean_checklist_item_line(row[0] if row else "")
+        comment = row[1] if len(row) > 1 else ""
+        if point or comment:
+            rows.append((point or "Prüfpunkt", comment))
+    return rows
+
+
+def clean_checklist_item_line(line):
+    value = (line or "").strip()
+    value = re.sub(r"^\s*(?:[-*•]+|\[[ xX]\]|\d+[\.)])\s*", "", value)
+    return value.strip()
 
 
 def save_upload(file_storage, motorcycle_id, folder):
