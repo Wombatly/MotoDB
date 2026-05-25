@@ -43,14 +43,6 @@
     </div>
   </div>
 
-  {% if not checklist %}
-    <div class="import-panel mt-4">
-      <h2 class="h5 mb-2">CSV einlesen</h2>
-      <p class="text-secondary mb-2">Format: Motorrad;Titel;km;Intervall;Position;Pruefpunkt;Kommentar</p>
-      <input class="form-control" id="csv_file" name="csv_file" type="file" accept=".csv,text/csv">
-    </div>
-  {% endif %}
-
   <h2 class="h5 mt-4 mb-3">Prüfpunkte</h2>
   <div class="checklist-builder" data-checklist-builder>
     {% set existing_items = checklist.items if checklist else [] %}
