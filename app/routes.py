@@ -1,6 +1,8 @@
 from datetime import date, datetime
+from io import BytesIO
 from pathlib import Path
 import shutil
+import zipfile
 
 from flask import (
     Blueprint,
@@ -10,7 +12,7 @@ from flask import (
     redirect,
     render_template,
     request,
-    Response,
+    send_file,
     send_from_directory,
     url_for,
 )
@@ -57,6 +59,20 @@ def current_user_motorcycles_query():
     return Motorcycle.query.filter_by(user_id=current_user.id)
 
 
+def template_zip_response(zip_filename, files):
+    zip_buffer = BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        for filename, content in files.items():
+            zf.writestr(filename, content)
+    zip_buffer.seek(0)
+    return send_file(
+        zip_buffer,
+        mimetype="application/zip",
+        as_attachment=True,
+        download_name=zip_filename,
+    )
+
+
 DEFAULT_CHECKLIST_CSV = "\n".join(
     [
         "Pruefpunkt;Kommentar",
@@ -65,6 +81,54 @@ DEFAULT_CHECKLIST_CSV = "\n".join(
         "Reifendruck pruefen;Herstellerangaben beachten",
     ]
 )
+
+CHECKLIST_TEMPLATE_README = """# Checklisten-Vorlage
+
+Datei im ZIP: `checklisten.csv`
+
+Kurzanleitung:
+- In die App gehen: Service > Checkliste anlegen.
+- Titel, Motorrad und Intervall in der App setzen.
+- Die Datei bei `Punkteliste hochladen` auswählen.
+- Dateiname ist egal. Wichtig ist der Inhalt der Spalten.
+
+Spalten:
+- `Pruefpunkt`: Der Text der Aufgabe. Daraus wird später eine Checkbox im Service.
+- `Kommentar`: Optionaler Hinweis zur Aufgabe.
+
+Du kannst Punkte ergänzen, löschen oder umbenennen.
+"""
+
+DEFAULT_TECHNICAL_CSV = "\n".join(
+    [
+        "Kategorie;Eintrag;Wert;Einheit",
+        "Motor;Hubraum;583;ccm",
+        "Motor;Leistung;50;PS",
+        "Motor;Drehmoment;53;Nm",
+        "Antrieb;Getriebe;5-Gang;",
+        "Reifen;Reifen vorne;90/90-21;",
+        "Reifen;Reifen hinten;130/80-17;",
+    ]
+)
+
+TECHNICAL_TEMPLATE_README = """# Datenblatt-Vorlage
+
+Datei im ZIP: `datenblatt.csv`
+
+Kurzanleitung:
+- In die App gehen: Profil > Upload > Datenblatt.
+- Motorrad auswählen.
+- Die Datei als CSV hochladen.
+- Dateiname ist egal. Wichtig ist der Inhalt der Spalten.
+
+Spalten:
+- `Kategorie`: Gruppiert die Angaben, zum Beispiel Motor, Reifen oder Antrieb.
+- `Eintrag`: Name des technischen Werts, zum Beispiel Hubraum oder Leistung.
+- `Wert`: Der konkrete Wert, zum Beispiel 583 oder 50.
+- `Einheit`: Optional, zum Beispiel ccm, PS, Nm oder leer lassen.
+
+Du kannst Kategorien, Einträge, Werte und Einheiten frei anpassen.
+"""
 
 DOCUMENT_CATEGORIES = [
     "Fahrzeugschein",
@@ -295,10 +359,12 @@ def checklist_new_global():
 @bp.route("/checklisten/csv-vorlage")
 @login_required
 def checklist_csv_template():
-    return Response(
-        DEFAULT_CHECKLIST_CSV + "\n",
-        mimetype="text/csv; charset=utf-8",
-        headers={"Content-Disposition": "attachment; filename=checklisten_vorlage.csv"},
+    return template_zip_response(
+        "checklisten_vorlage.zip",
+        {
+            "checklisten.csv": DEFAULT_CHECKLIST_CSV + "\n",
+            "README.md": CHECKLIST_TEMPLATE_README,
+        },
     )
 
 
@@ -330,22 +396,14 @@ def technical_data_global():
 
 
 @bp.route("/technik/csv-vorlage")
+@login_required
 def technical_csv_template():
-    csv_text = "\n".join(
-        [
-            "Kategorie;Eintrag;Wert;Einheit;Quelle",
-            "Motor;Hubraum;583;ccm;Fahrzeugschein",
-            "Motor;Leistung;50;PS;Fahrzeugschein",
-            "Motor;Drehmoment;53;Nm;Werkstatthandbuch",
-            "Antrieb;Getriebe;5-Gang;;Werkstatthandbuch",
-            "Reifen;Reifen vorne;90/90-21;;Handbuch",
-            "Reifen;Reifen hinten;130/80-17;;Handbuch",
-        ]
-    )
-    return Response(
-        csv_text,
-        mimetype="text/csv; charset=utf-8",
-        headers={"Content-Disposition": "attachment; filename=technische_daten_vorlage.csv"},
+    return template_zip_response(
+        "datenblatt_vorlage.zip",
+        {
+            "datenblatt.csv": DEFAULT_TECHNICAL_CSV + "\n",
+            "README.md": TECHNICAL_TEMPLATE_README,
+        },
     )
 
 
