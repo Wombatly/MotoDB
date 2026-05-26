@@ -34,6 +34,10 @@ document.querySelector("[data-technical-motorcycle-select]")?.addEventListener("
   window.location.href = `/technik?motorrad_id=${event.target.value}`;
 });
 
+document.querySelector("[data-checklist-import-motorcycle-select]")?.addEventListener("change", (event) => {
+  window.location.href = `/checklisten/import?motorrad_id=${event.target.value}`;
+});
+
 document.querySelector("[data-document-motorcycle-select]")?.addEventListener("change", (event) => {
   window.location.href = `/dokumente?motorrad_id=${event.target.value}`;
 });

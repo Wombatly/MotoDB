@@ -8,8 +8,12 @@ from io import BytesIO
 from pathlib import Path
 from unittest.mock import patch
 
+from PIL import Image
+from werkzeug.datastructures import FileStorage
+
 from app import create_app, db
 from app.models import Motorcycle, MotorcycleImage, ServiceChecklist, ServiceChecklistItem, ServiceEntry, TechnicalSpec, User
+from app.utils import parse_checklist_item_file
 
 
 class SecurityTestCase(unittest.TestCase):
@@ -24,7 +28,16 @@ class SecurityTestCase(unittest.TestCase):
         with patch.dict(os.environ, env, clear=True):
             app = create_app()
         app.config.update(TESTING=True)
+        from app.auth import AUTH_ATTEMPTS
+        AUTH_ATTEMPTS.clear()
         return app
+
+    def make_png_upload(self):
+        image_buffer = BytesIO()
+        image = Image.new("RGB", (16, 16), color=(20, 80, 140))
+        image.save(image_buffer, format="PNG")
+        image_buffer.seek(0)
+        return image_buffer
 
     def test_public_hosting_requires_non_default_secret(self):
         with tempfile.TemporaryDirectory() as tempdir:
@@ -94,6 +107,33 @@ class SecurityTestCase(unittest.TestCase):
             )
             self.assertEqual(client.get("/logout").status_code, 405)
 
+    def test_login_rate_limit_blocks_repeated_failures(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            app = self.build_app(tempdir)
+            app.config.update(WTF_CSRF_ENABLED=False)
+            with app.app_context():
+                user = User(username="limited", email="limited@example.com")
+                user.set_password("correct-password")
+                db.session.add(user)
+                db.session.commit()
+
+            client = app.test_client()
+            for _ in range(5):
+                response = client.post(
+                    "/login",
+                    data={"email": "limited@example.com", "password": "wrong-password"},
+                )
+                self.assertEqual(response.status_code, 302)
+
+            blocked_response = client.post(
+                "/login",
+                data={"email": "limited@example.com", "password": "correct-password"},
+                follow_redirects=True,
+            )
+
+            self.assertEqual(blocked_response.status_code, 200)
+            self.assertIn("Zu viele Anmeldeversuche".encode("utf-8"), blocked_response.data)
+
     def test_uploads_require_login_and_motorcycle_ownership(self):
         with tempfile.TemporaryDirectory() as tempdir:
             app = self.build_app(tempdir)
@@ -119,6 +159,68 @@ class SecurityTestCase(unittest.TestCase):
                 session["_fresh"] = True
 
             self.assertEqual(client.get(upload_url).status_code, 403)
+
+    def test_upload_validation_rejects_fake_images_and_normalizes_valid_images(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            app = self.build_app(tempdir)
+            app.config.update(WTF_CSRF_ENABLED=False)
+            with app.app_context():
+                user = User(username="uploader", email="uploader@example.com")
+                user.set_password("uploader-password")
+                db.session.add(user)
+                db.session.flush()
+                motorcycle = Motorcycle(user_id=user.id, marke="Honda", modell="CB500")
+                db.session.add(motorcycle)
+                db.session.commit()
+                user_id = user.id
+                motorcycle_id = motorcycle.id
+
+            client = app.test_client()
+            with client.session_transaction() as session:
+                session["_user_id"] = str(user_id)
+                session["_fresh"] = True
+
+            invalid_response = client.post(
+                f"/motorrad/{motorcycle_id}/bearbeiten",
+                data={
+                    "marke": "Honda",
+                    "modell": "CB500",
+                    "bilder": (BytesIO(b"not actually an image"), "fake.jpg"),
+                },
+                content_type="multipart/form-data",
+            )
+
+            self.assertEqual(invalid_response.status_code, 302)
+            with app.app_context():
+                self.assertEqual(MotorcycleImage.query.count(), 0)
+
+            valid_response = client.post(
+                f"/motorrad/{motorcycle_id}/bearbeiten",
+                data={
+                    "marke": "Honda",
+                    "modell": "CB500",
+                    "bilder": (self.make_png_upload(), "bike.png"),
+                },
+                content_type="multipart/form-data",
+            )
+
+            self.assertEqual(valid_response.status_code, 302)
+            with app.app_context():
+                image = MotorcycleImage.query.one()
+                self.assertTrue(image.path.endswith(".jpg"))
+                stored_path = Path(app.config["UPLOAD_FOLDER"]) / image.path
+                self.assertTrue(stored_path.exists())
+                self.assertEqual(stored_path.read_bytes()[:2], b"\xff\xd8")
+
+    def test_checklist_item_pdf_import_rejects_invalid_and_oversized_files(self):
+        invalid_pdf = FileStorage(stream=BytesIO(b"not a pdf"), filename="liste.pdf")
+        oversized_text = FileStorage(
+            stream=BytesIO(b"x" * (2 * 1024 * 1024 + 2)),
+            filename="liste.txt",
+        )
+
+        self.assertEqual(parse_checklist_item_file(invalid_pdf), [])
+        self.assertEqual(parse_checklist_item_file(oversized_text), [])
 
     def test_user_settings_offer_profile_deletion(self):
         with tempfile.TemporaryDirectory() as tempdir:
@@ -250,7 +352,7 @@ class SecurityTestCase(unittest.TestCase):
                 self.assertIn(b"Oelstand pruefen;", checklist_csv)
                 self.assertNotIn(b"Motorrad;Titel;km;Intervall", checklist_csv)
                 self.assertIn("Datei im ZIP: `checklisten.csv`", checklist_readme)
-                self.assertIn("Punkteliste hochladen", checklist_readme)
+                self.assertIn("Punkteliste einlesen", checklist_readme)
 
             self.assertEqual(technical_response.status_code, 200)
             self.assertEqual(technical_response.mimetype, "application/zip")
@@ -293,7 +395,7 @@ class SecurityTestCase(unittest.TestCase):
                 ]
             )
             import_response = client.post(
-                f"/motorrad/{motorcycle_id}/checklisten/neu",
+                f"/motorrad/{motorcycle_id}/checklisten/import",
                 data={"csv_file": (BytesIO(csv_text.encode("utf-8")), "checklisten.csv")},
                 content_type="multipart/form-data",
             )
@@ -314,7 +416,7 @@ class SecurityTestCase(unittest.TestCase):
             self.assertIn("Oelstand pruefen".encode("utf-8"), service_response.data)
             self.assertIn("Ventilspiel pruefen".encode("utf-8"), service_response.data)
 
-    def test_checklist_form_adds_points_from_uploaded_list(self):
+    def test_checklist_import_adds_points_from_uploaded_list(self):
         with tempfile.TemporaryDirectory() as tempdir:
             app = self.build_app(tempdir)
             app.config.update(WTF_CSRF_ENABLED=False)
@@ -338,11 +440,16 @@ class SecurityTestCase(unittest.TestCase):
             self.assertEqual(form_response.status_code, 200)
             self.assertEqual(form_response.data.count(b'name="item_text"'), 2)
             self.assertIn(b"data-add-checklist-item", form_response.data)
-            self.assertIn(b"item_list_file", form_response.data)
+            self.assertNotIn(b"item_list_file", form_response.data)
+
+            import_form_response = client.get(f"/motorrad/{motorcycle_id}/checklisten/import")
+            self.assertEqual(import_form_response.status_code, 200)
+            self.assertIn(b"item_list_file", import_form_response.data)
+            self.assertNotIn(b"data-add-checklist-item", import_form_response.data)
 
             item_list = "\n".join(["Oelstand pruefen", "- Bremsen pruefen", "3. Kette schmieren"])
             create_response = client.post(
-                f"/motorrad/{motorcycle_id}/checklisten/neu",
+                f"/motorrad/{motorcycle_id}/checklisten/import",
                 data={
                     "motorrad_id": str(motorcycle_id),
                     "titel": "Importierte Punkteliste",

@@ -33,6 +33,12 @@ document.getElementById("syncButton")?.addEventListener("click", async () => {
 });
 
 async function saveServiceFormOffline(form) {
+  const receiptInput = form.querySelector('input[type="file"][name="beleg"]');
+  if (receiptInput?.files?.length) {
+    showToast("Belege können offline nicht gespeichert werden.");
+    return;
+  }
+
   form.querySelectorAll(".number-input").forEach((input) => {
     input.value = input.value.replace(/[^\d]/g, "");
   });
@@ -65,6 +71,10 @@ async function saveServiceFormOffline(form) {
 }
 
 document.querySelector("[data-offline-service-form]")?.addEventListener("submit", async (event) => {
+  if (navigator.onLine) {
+    return;
+  }
+
   event.preventDefault();
   const form = document.querySelector("[data-offline-service-form]");
   if (!form) return;

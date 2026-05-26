@@ -67,7 +67,7 @@ Betrieb auf einem Raspberry Pi per Docker und Nginx bereitgestellt werden.
   - 20.000 km großer Service
   - Saisoncheck
 - Checklistenpunkte mit Kommentaren und Hinweisen pflegen.
-- Checklisten aus CSV importieren.
+- Punktelisten über eine eigene Importseite einlesen.
 - Checklisten als erledigte Wartungsnachweise speichern.
 - Erledigte Punkte und Anmerkungen pro Durchführung erfassen.
 
@@ -100,10 +100,14 @@ Betrieb auf einem Raspberry Pi per Docker und Nginx bereitgestellt werden.
 Die Python-Abhängigkeiten stehen in `requirements.txt`:
 
 ```txt
-Flask==3.0.3
+Flask==3.1.3
 Flask-SQLAlchemy==3.1.1
-Pillow==10.4.0
+Flask-Login==0.6.3
+Flask-WTF==1.2.1
+Pillow==12.2.0
+pypdf==6.12.2
 gunicorn==22.0.0
+Werkzeug==3.1.8
 ```
 
 ## Projektstruktur
@@ -150,7 +154,7 @@ Deployments und Backups besonders geschützt werden.
 
 ### Voraussetzungen
 
-- Python 3.12 oder kompatible Python-3-Version
+- Python 3.12
 - `pip`
 - Optional: virtuelles Environment
 
@@ -330,6 +334,13 @@ Die App ist für mobile Nutzung gedacht. Das Menü ist kompakt gehalten und wird
 
 Checklisten können direkt in der Anwendung, über Presets oder per CSV angelegt
 werden.
+
+Punktelisten können über eigene Importseiten hochgeladen werden:
+
+```text
+/checklisten/import
+/motorrad/<id>/checklisten/import
+```
 
 ### Presets
 
@@ -569,11 +580,12 @@ Für Bilder wird Pillow verwendet. Beim Upload werden Bilder:
 
 - anhand der EXIF-Orientierung ausgerichtet,
 - auf maximal `1600 x 1200` verkleinert,
-- als JPEG mit Qualität `82` gespeichert,
+- als `.jpg` mit Qualität `82` gespeichert,
 - progressiv und optimiert geschrieben.
 
 Belege werden als Datei gespeichert und mit dem Originalnamen im
-Serviceeintrag referenziert.
+Serviceeintrag referenziert. Bildbelege werden ebenfalls als `.jpg`
+normalisiert. Uploads sind auf maximal `32 MB` begrenzt.
 
 ## Backups
 
@@ -703,8 +715,10 @@ HTTPS-Schema über die Proxy-Header sehen.
 | `/motorrad/<id>/technik` | Technische Daten für ein Motorrad |
 | `/technik/csv-vorlage` | CSV-Vorlage für technische Daten |
 | `/checklisten/neu` | Checkliste global anlegen |
+| `/checklisten/import` | Punkteliste global importieren |
 | `/motorrad/<id>/checklisten` | Checklisten eines Motorrads |
 | `/motorrad/<id>/checklisten/neu` | Checkliste für ein Motorrad anlegen |
+| `/motorrad/<id>/checklisten/import` | Punkteliste für ein Motorrad importieren |
 | `/checklisten/<id>` | Checkliste anzeigen oder durchführen |
 | `/checklisten/csv-vorlage` | CSV-Vorlage für Checklisten |
 | `/einstellungen` | App-Einstellungen |

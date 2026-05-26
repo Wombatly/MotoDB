@@ -15,6 +15,16 @@ except ImportError:
     Image = None
     ImageOps = None
 
+if Image is not None:
+    Image.MAX_IMAGE_PIXELS = 24_000_000
+
+ALLOWED_IMAGE_FORMATS = ("JPEG", "PNG", "WEBP")
+IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
+PDF_EXTENSION = ".pdf"
+MAX_CHECKLIST_ITEM_FILE_BYTES = 2 * 1024 * 1024
+MAX_PDF_PAGES = 20
+MAX_EXTRACTED_TEXT_CHARS = 100_000
+
 
 CATEGORIES = [
     "Wartung / Service",
@@ -345,12 +355,14 @@ def parse_checklist_item_file(file_storage):
     if not file_storage or not file_storage.filename:
         return []
 
-    raw = file_storage.read()
+    raw = file_storage.read(MAX_CHECKLIST_ITEM_FILE_BYTES + 1)
     if not raw:
+        return []
+    if len(raw) > MAX_CHECKLIST_ITEM_FILE_BYTES:
         return []
 
     extension = Path(file_storage.filename).suffix.lower()
-    if extension == ".pdf":
+    if extension == PDF_EXTENSION:
         text = extract_pdf_text(raw)
     else:
         text = raw.decode("utf-8-sig", errors="ignore")
@@ -361,22 +373,41 @@ def parse_checklist_item_file(file_storage):
 
 
 def extract_pdf_text(raw):
+    if not raw.startswith(b"%PDF-"):
+        return ""
+
     try:
         from pypdf import PdfReader
     except ImportError:
         return ""
 
     try:
-        reader = PdfReader(io.BytesIO(raw))
+        reader = PdfReader(io.BytesIO(raw), strict=False)
     except Exception:
         return ""
 
+    if getattr(reader, "is_encrypted", False):
+        return ""
+
     page_text = []
+    try:
+        page_count = len(reader.pages)
+    except Exception:
+        return ""
+    if page_count > MAX_PDF_PAGES:
+        return ""
+
+    extracted_chars = 0
     for page in reader.pages:
         try:
-            page_text.append(page.extract_text() or "")
+            text = page.extract_text() or ""
         except Exception:
             continue
+        remaining = MAX_EXTRACTED_TEXT_CHARS - extracted_chars
+        if remaining <= 0:
+            break
+        page_text.append(text[:remaining])
+        extracted_chars += len(page_text[-1])
     return "\n".join(page_text)
 
 
@@ -472,35 +503,66 @@ def save_upload(file_storage, motorcycle_id, folder):
         return None, None
 
     original_name = secure_filename(file_storage.filename)
+    if not original_name:
+        return None, None
+
     extension = Path(original_name).suffix.lower()
     allowed_extensions = {
-        "images": {".jpg", ".jpeg", ".png", ".webp"},
-        "receipts": {".jpg", ".jpeg", ".png", ".webp", ".pdf"},
-        "documents": {".jpg", ".jpeg", ".png", ".webp", ".pdf"},
+        "images": IMAGE_EXTENSIONS,
+        "receipts": IMAGE_EXTENSIONS | {PDF_EXTENSION},
+        "documents": IMAGE_EXTENSIONS | {PDF_EXTENSION},
     }
     if extension not in allowed_extensions.get(folder, set()):
         return None, None
 
-    filename = f"{datetime.utcnow().strftime('%Y%m%d%H%M%S')}_{uuid4().hex[:8]}{extension}"
+    stored_extension = ".jpg" if extension in IMAGE_EXTENSIONS else extension
+    filename = f"{datetime.utcnow().strftime('%Y%m%d%H%M%S')}_{uuid4().hex[:8]}{stored_extension}"
     relative_path = Path(str(motorcycle_id)) / folder / filename
     target = current_app.config["UPLOAD_FOLDER"] / relative_path
     target.parent.mkdir(parents=True, exist_ok=True)
-    file_storage.save(target)
-    if folder == "images":
-        optimize_image(target)
+    temp_path = target.with_name(f".{target.name}.tmp")
+
+    try:
+        file_storage.save(temp_path)
+        if extension in IMAGE_EXTENSIONS:
+            if Image is None:
+                return None, None
+            optimize_image(temp_path, target)
+        elif extension == PDF_EXTENSION:
+            if not validate_pdf_file(temp_path):
+                return None, None
+            temp_path.replace(target)
+        else:
+            return None, None
+    except Exception:
+        target.unlink(missing_ok=True)
+        return None, None
+    finally:
+        temp_path.unlink(missing_ok=True)
+
     return str(relative_path), original_name
 
 
-def optimize_image(path, max_size=(1600, 1200), quality=82):
+def validate_pdf_file(path):
+    try:
+        with open(path, "rb") as uploaded_file:
+            return uploaded_file.read(5) == b"%PDF-"
+    except OSError:
+        return False
+
+
+def optimize_image(source_path, target_path, max_size=(1600, 1200), quality=82):
     if Image is None:
         return
 
-    try:
-        with Image.open(path) as image:
-            image = ImageOps.exif_transpose(image)
-            image.thumbnail(max_size)
-            if image.mode not in ("RGB", "L"):
-                image = image.convert("RGB")
-            image.save(path, format="JPEG", quality=quality, optimize=True, progressive=True)
-    except Exception:
-        return
+    with Image.open(source_path, formats=ALLOWED_IMAGE_FORMATS) as image:
+        if image.format not in ALLOWED_IMAGE_FORMATS:
+            raise ValueError("Unsupported image format")
+        image.verify()
+
+    with Image.open(source_path, formats=ALLOWED_IMAGE_FORMATS) as image:
+        image = ImageOps.exif_transpose(image)
+        image.thumbnail(max_size)
+        if image.mode not in ("RGB", "L"):
+            image = image.convert("RGB")
+        image.save(target_path, format="JPEG", quality=quality, optimize=True, progressive=True)

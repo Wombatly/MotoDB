@@ -43,7 +43,7 @@ def create_app():
     app.config["UPLOAD_FOLDER"] = Path(
         os.environ.get("MOTORRAD_UPLOAD_FOLDER", Path(app.instance_path) / "uploads")
     )
-    app.config["MAX_CONTENT_LENGTH"] = 64 * 1024 * 1024
+    app.config["MAX_CONTENT_LENGTH"] = 32 * 1024 * 1024
     app.config["MOTODB_PUBLIC_HOSTING"] = public_hosting
     app.config["MOTODB_ALLOW_REGISTRATION"] = env_bool(
         "MOTODB_ALLOW_REGISTRATION",

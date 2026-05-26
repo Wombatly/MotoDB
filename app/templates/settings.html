@@ -70,7 +70,10 @@
 
 <section class="form-panel mt-3">
   <h2 class="h5 mb-3">Upload</h2>
-  <p class="text-secondary mb-3">Technische Daten einlesen oder bearbeiten.</p>
-  <a class="btn btn-outline-secondary" href="{{ url_for('main.technical_data_global') }}">Datenblatt</a>
+  <p class="text-secondary mb-3">Punktelisten importieren oder technische Daten einlesen/bearbeiten.</p>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-secondary" href="{{ url_for('main.checklist_import_global') }}">Checklisten</a>
+    <a class="btn btn-outline-secondary" href="{{ url_for('main.technical_data_global') }}">Datenblatt</a>
+  </div>
 </section>
 {% endblock %}

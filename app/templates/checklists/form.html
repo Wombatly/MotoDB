@@ -14,7 +14,7 @@
   {% endif %}
 </div>
 
-<form method="post" class="form-panel" enctype="multipart/form-data">
+<form method="post" class="form-panel">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <input type="hidden" name="preset" value="{{ preset_key }}">
   <div class="row g-3">
@@ -99,12 +99,6 @@
   </template>
   <div class="d-flex gap-2 mt-3">
     <button class="btn btn-outline-secondary" type="button" data-add-checklist-item>Punkt hinzufügen</button>
-  </div>
-
-  <div class="import-panel mt-4">
-    <h2 class="h5 mb-2">Punkteliste hochladen</h2>
-    <p class="text-secondary mb-2">Nur CSV, TXT, MD oder PDF-Dateien.</p>
-    <input class="form-control" id="item_list_file" name="item_list_file" type="file" accept=".csv,text/csv,.txt,text/plain,.md,text/markdown,.pdf,application/pdf">
   </div>
 
   <div class="row g-3">

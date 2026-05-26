@@ -87,9 +87,9 @@ CHECKLIST_TEMPLATE_README = """# Checklisten-Vorlage
 Datei im ZIP: `checklisten.csv`
 
 Kurzanleitung:
-- In die App gehen: Service > Checkliste anlegen.
+- In die App gehen: Profil > Upload > Checklisten.
 - Titel, Motorrad und Intervall in der App setzen.
-- Die Datei bei `Punkteliste hochladen` auswählen.
+- Die Datei bei `Punkteliste einlesen` auswählen.
 - Dateiname ist egal. Wichtig ist der Inhalt der Spalten.
 
 Spalten:
@@ -250,7 +250,7 @@ def backup_path_update():
         db.session.add(setting)
     setting.value = request.form.get("backup_path", "").strip() or "/PFAD/ZUM/SICHERUNGSORDNER"
     db.session.commit()
-    return redirect(request.referrer or url_for("main.index"))
+    return redirect(url_for("main.settings"))
 
 
 @bp.route("/einstellungen")
@@ -327,11 +327,6 @@ def document_delete(document_id):
 def checklist_new_global():
     motorcycles = current_user_motorcycles_query().order_by(Motorcycle.marke, Motorcycle.modell).all()
     if request.method == "POST":
-        imported = create_checklists_from_csv(request.files.get("csv_file"))
-        if imported:
-            db.session.commit()
-            return redirect(url_for("main.checklist_index", motorrad_id=imported[0].motorrad_id))
-
         motorrad_id = parse_int(request.form.get("motorrad_id"))
         motorcycle = require_motorcycle_ownership(motorrad_id)
         checklist = create_checklist_from_form(motorcycle)
@@ -353,6 +348,35 @@ def checklist_new_global():
         preset_key=preset_key,
         preset=preset,
         presets=SERVICE_CHECKLIST_PRESETS,
+    )
+
+
+@bp.route("/checklisten/import", methods=["GET", "POST"])
+@login_required
+def checklist_import_global():
+    motorcycles = current_user_motorcycles_query().order_by(Motorcycle.marke, Motorcycle.modell).all()
+    if request.method == "POST":
+        imported = create_checklists_from_csv(request.files.get("csv_file"))
+        if imported:
+            db.session.commit()
+            return redirect(url_for("main.checklist_index", motorrad_id=imported[0].motorrad_id))
+
+        motorrad_id = parse_int(request.form.get("motorrad_id"))
+        motorcycle = require_motorcycle_ownership(motorrad_id)
+        checklist = create_checklist_from_form(motorcycle)
+        db.session.commit()
+        return redirect(url_for("main.checklist_index", motorrad_id=checklist.motorrad_id))
+
+    selected_id = parse_int(request.args.get("motorrad_id"))
+    selected_motorcycle = (
+        current_user_motorcycles_query().filter_by(id=selected_id).first()
+        if selected_id
+        else (motorcycles[0] if motorcycles else None)
+    )
+    return render_template(
+        "checklists/import.html",
+        motorcycle=selected_motorcycle,
+        motorcycles=motorcycles,
     )
 
 
@@ -603,11 +627,6 @@ def checklist_new(motorrad_id):
     preset = SERVICE_CHECKLIST_PRESETS.get(preset_key, {})
 
     if request.method == "POST":
-        imported = create_checklists_from_csv(request.files.get("csv_file"))
-        if imported:
-            db.session.commit()
-            return redirect(url_for("main.checklist_index", motorrad_id=motorcycle.id))
-
         checklist = create_checklist_from_form(motorcycle)
         db.session.commit()
         return redirect(url_for("main.checklist_index", motorrad_id=checklist.motorrad_id))
@@ -619,6 +638,29 @@ def checklist_new(motorrad_id):
         preset_key=preset_key,
         preset=preset,
         presets=SERVICE_CHECKLIST_PRESETS,
+    )
+
+
+@bp.route("/motorrad/<int:motorrad_id>/checklisten/import", methods=["GET", "POST"])
+@login_required
+def checklist_import(motorrad_id):
+    motorcycle = require_motorcycle_ownership(motorrad_id)
+    if request.method == "POST":
+        imported = create_checklists_from_csv(request.files.get("csv_file"))
+        if imported:
+            db.session.commit()
+            return redirect(url_for("main.checklist_index", motorrad_id=imported[0].motorrad_id))
+
+        form_motorcycle_id = parse_int(request.form.get("motorrad_id")) or motorrad_id
+        motorcycle = require_motorcycle_ownership(form_motorcycle_id)
+        checklist = create_checklist_from_form(motorcycle)
+        db.session.commit()
+        return redirect(url_for("main.checklist_index", motorrad_id=checklist.motorrad_id))
+
+    return render_template(
+        "checklists/import.html",
+        motorcycle=motorcycle,
+        motorcycles=current_user_motorcycles_query().order_by(Motorcycle.marke, Motorcycle.modell).all(),
     )
 
 

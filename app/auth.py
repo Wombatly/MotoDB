@@ -5,6 +5,7 @@ from datetime import datetime
 from functools import wraps
 from io import BytesIO
 from pathlib import Path
+from time import monotonic
 
 from flask import Blueprint, abort, render_template, request, redirect, url_for, flash, current_app, send_file
 from flask_login import login_user, logout_user, login_required, current_user
@@ -15,6 +16,11 @@ from app.models import User, Motorcycle, MotorcycleDocument, MotorcycleImage, Se
 
 auth_bp = Blueprint('auth', __name__)
 
+AUTH_ATTEMPTS = {}
+AUTH_RATE_LIMIT_WINDOW_SECONDS = 15 * 60
+LOGIN_MAX_FAILURES = 5
+REGISTER_MAX_POSTS = 10
+
 
 def admin_required(f):
     @wraps(f)
@@ -24,6 +30,42 @@ def admin_required(f):
             return redirect(url_for('main.index'))
         return f(*args, **kwargs)
     return decorated_function
+
+
+def client_rate_limit_id():
+    return request.remote_addr or "unknown"
+
+
+def auth_rate_limit_key(scope, identifier=""):
+    return f"{scope}:{client_rate_limit_id()}:{identifier.strip().lower()}"
+
+
+def recent_auth_attempts(key, window_seconds=AUTH_RATE_LIMIT_WINDOW_SECONDS):
+    now = monotonic()
+    attempts = [
+        timestamp
+        for timestamp in AUTH_ATTEMPTS.get(key, [])
+        if now - timestamp < window_seconds
+    ]
+    AUTH_ATTEMPTS[key] = attempts
+    return attempts
+
+
+def is_auth_rate_limited(keys, limit):
+    return any(len(recent_auth_attempts(key)) >= limit for key in keys)
+
+
+def record_auth_attempt(keys):
+    now = monotonic()
+    for key in keys:
+        attempts = recent_auth_attempts(key)
+        attempts.append(now)
+        AUTH_ATTEMPTS[key] = attempts
+
+
+def clear_auth_attempts(keys):
+    for key in keys:
+        AUTH_ATTEMPTS.pop(key, None)
 
 
 def delete_user_uploads(user):
@@ -68,6 +110,12 @@ def register():
         abort(404)
 
     if request.method == 'POST':
+        rate_limit_keys = [auth_rate_limit_key("register")]
+        if is_auth_rate_limited(rate_limit_keys, REGISTER_MAX_POSTS):
+            flash('Zu viele Registrierungsversuche. Bitte warte kurz und versuche es erneut.', 'danger')
+            return redirect(url_for('auth.register'))
+        record_auth_attempt(rate_limit_keys)
+
         username = request.form.get('username', '').strip()
         email = request.form.get('email', '').strip()
         password = request.form.get('password', '')
@@ -112,17 +160,28 @@ def login():
     if request.method == 'POST':
         email = request.form.get('email', '').strip()
         password = request.form.get('password', '')
+        rate_limit_keys = [
+            auth_rate_limit_key("login-ip"),
+            auth_rate_limit_key("login-email", email),
+        ]
+
+        if is_auth_rate_limited(rate_limit_keys, LOGIN_MAX_FAILURES):
+            flash('Zu viele Anmeldeversuche. Bitte warte kurz und versuche es erneut.', 'danger')
+            return redirect(url_for('auth.login'))
 
         if not email or not password:
+            record_auth_attempt(rate_limit_keys)
             flash('Email und Passwort erforderlich.', 'danger')
             return redirect(url_for('auth.login'))
 
         user = User.query.filter_by(email=email).first()
 
         if not user or not user.check_password(password):
+            record_auth_attempt(rate_limit_keys)
             flash('Email oder Passwort falsch.', 'danger')
             return redirect(url_for('auth.login'))
 
+        clear_auth_attempts(rate_limit_keys)
         login_user(user)
         user.last_login = datetime.utcnow()
         db.session.commit()

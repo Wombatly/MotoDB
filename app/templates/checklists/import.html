@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Checklisten importieren{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-start justify-content-between gap-3 mb-3">
+  <div>
+    <h1 class="h3 mb-1">Checklisten</h1>
+    <p class="text-secondary mb-0">Punkteliste einem Motorrad zuordnen.</p>
+  </div>
+  {% if motorcycle %}
+    <a class="btn btn-outline-secondary" href="{{ url_for('main.checklist_index', motorrad_id=motorcycle.id) }}">Zurück</a>
+  {% else %}
+    <a class="btn btn-outline-secondary" href="{{ url_for('main.index') }}">Zurück</a>
+  {% endif %}
+</div>
+
+<form method="post" enctype="multipart/form-data" class="form-panel">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <label class="form-label" for="motorrad_id">Motorrad</label>
+  <select class="form-select mb-3" id="motorrad_id" name="motorrad_id" data-checklist-import-motorcycle-select required>
+    {% for option in motorcycles %}
+      <option value="{{ option.id }}" {% if motorcycle and option.id == motorcycle.id %}selected{% endif %}>{{ option.marke }} {{ option.modell }}</option>
+    {% endfor %}
+  </select>
+
+  <div class="row g-3">
+    <div class="col-12">
+      <label class="form-label" for="titel">Titel</label>
+      <input class="form-control" id="titel" name="titel" required>
+    </div>
+    <div class="col-6 col-md-2">
+      <label class="form-label" for="intervall_km">km</label>
+      <input class="form-control number-input" id="intervall_km" name="intervall_km" inputmode="numeric" data-number-suffix="km">
+    </div>
+    <div class="col-6 col-md-2">
+      <label class="form-label" for="intervall_monate">Intervall</label>
+      <input class="form-control number-input" id="intervall_monate" name="intervall_monate" inputmode="numeric">
+    </div>
+  </div>
+
+  <h2 class="h5 mt-4 mb-3">Einlesen</h2>
+  <label class="form-label" for="item_list_file">Punkteliste einlesen</label>
+  <p class="text-secondary mb-2">Nur CSV, TXT, MD oder PDF-Dateien.</p>
+  <input class="form-control mb-3" id="item_list_file" name="item_list_file" type="file" accept=".csv,text/csv,.txt,text/plain,.md,text/markdown,.pdf,application/pdf" required>
+
+  <label class="form-label" for="anmerkungen">Anmerkungen</label>
+  <textarea class="form-control" id="anmerkungen" name="anmerkungen" rows="3"></textarea>
+
+  <div class="d-flex gap-2 mt-4">
+    <button class="btn btn-primary" type="submit">Speichern</button>
+    {% if motorcycle %}
+      <a class="btn btn-outline-secondary" href="{{ url_for('main.checklist_index', motorrad_id=motorcycle.id) }}">Abbrechen</a>
+    {% else %}
+      <a class="btn btn-outline-secondary" href="{{ url_for('main.index') }}">Abbrechen</a>
+    {% endif %}
+  </div>
+</form>
+{% endblock %}
