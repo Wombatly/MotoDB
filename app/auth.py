@@ -479,7 +479,10 @@ def user_delete():
 @login_required
 @admin_required
 def admin_users():
+    from app.routes import user_storage_usage_bytes, MAX_USER_STORAGE_BYTES
+
     users = User.query.order_by(User.username, User.email).all()
+    user_storage = {user.id: user_storage_usage_bytes(user.id) for user in users}
     stats = {
         "users": len(users),
         "motorcycles": Motorcycle.query.count(),
@@ -502,7 +505,14 @@ def admin_users():
     except OSError:
         disk_usage = None
 
-    return render_template('admin/users.html', users=users, stats=stats, disk_usage=disk_usage)
+    return render_template(
+        'admin/users.html',
+        users=users,
+        stats=stats,
+        disk_usage=disk_usage,
+        user_storage=user_storage,
+        storage_limit=MAX_USER_STORAGE_BYTES,
+    )
 
 
 @auth_bp.route('/admin/users/<int:user_id>/toggle-admin', methods=['POST'])
