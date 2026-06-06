@@ -54,6 +54,14 @@
   </a>
 </section>
 
+<section class="form-panel mt-3">
+  <h2 class="h5 mb-3">Speicherbelegung</h2>
+  <p class="text-secondary mb-2">
+    {{ storage_used|filesize }} von {{ storage_limit|filesize }} belegt ({{ storage_percent }} %)
+  </p>
+  <progress class="storage-meter" max="100" value="{{ storage_percent }}" aria-label="{{ storage_percent }} Prozent belegt"></progress>
+</section>
+
 {% if current_user.is_admin %}
   <form class="form-panel mt-3" method="post" action="{{ url_for('main.backup_path_update') }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

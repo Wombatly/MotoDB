@@ -1,6 +1,7 @@
 from datetime import date, datetime
 from io import BytesIO
 from pathlib import Path
+import os
 import shutil
 import zipfile
 
@@ -8,6 +9,7 @@ from flask import (
     Blueprint,
     abort,
     current_app,
+    flash,
     jsonify,
     redirect,
     render_template,
@@ -45,6 +47,8 @@ from app.utils import (
 
 
 bp = Blueprint("main", __name__)
+
+MAX_USER_STORAGE_BYTES = 500 * 1024 * 1024  # 500 MB Speicherlimit pro Account
 
 
 def require_motorcycle_ownership(motorcycle_id):
@@ -256,7 +260,18 @@ def backup_path_update():
 @bp.route("/einstellungen")
 @login_required
 def settings():
-    return render_template("settings.html")
+    storage_used = user_storage_usage_bytes(current_user.id)
+    storage_percent = (
+        min(round(storage_used / MAX_USER_STORAGE_BYTES * 100), 100)
+        if MAX_USER_STORAGE_BYTES
+        else 0
+    )
+    return render_template(
+        "settings.html",
+        storage_used=storage_used,
+        storage_limit=MAX_USER_STORAGE_BYTES,
+        storage_percent=storage_percent,
+    )
 
 
 @bp.route("/datenschutz")
@@ -270,7 +285,11 @@ def documents():
     motorcycles = current_user_motorcycles_query().order_by(Motorcycle.marke, Motorcycle.modell).all()
     if request.method == "POST":
         motorcycle = require_motorcycle_ownership(parse_int(request.form.get("motorrad_id")))
-        document_path, original_name = save_upload(request.files.get("document"), motorcycle.id, "documents")
+        document_file = request.files.get("document")
+        if storage_quota_exceeded(current_user.id, [document_file]):
+            flash("Speicherlimit von 500 MB erreicht. Bitte lösche zuerst Dateien.", "danger")
+            return redirect(url_for("main.documents", motorrad_id=motorcycle.id))
+        document_path, original_name = save_upload(document_file, motorcycle.id, "documents")
         if document_path:
             title = request.form.get("titel", "").strip() or original_name or "Dokument"
             category = request.form.get("kategorie") or "Sonstiges"
@@ -441,7 +460,10 @@ def motorcycle_new():
         db.session.add(motorcycle)
         db.session.flush()
         uploaded_images = request.files.getlist("bilder") or [request.files.get("bild")]
-        add_motorcycle_images(motorcycle, uploaded_images)
+        if storage_quota_exceeded(current_user.id, uploaded_images):
+            flash("Speicherlimit von 500 MB erreicht – Bilder wurden nicht gespeichert.", "danger")
+        else:
+            add_motorcycle_images(motorcycle, uploaded_images)
         db.session.commit()
         return redirect(url_for("main.motorcycle_detail", motorrad_id=motorcycle.id))
     return render_template("motorcycles/form.html", motorcycle=motorcycle, title="Motorrad anlegen", gallery_images=[])
@@ -503,7 +525,10 @@ def motorcycle_edit(motorrad_id):
     if request.method == "POST":
         fill_motorcycle(motorcycle)
         uploaded_images = request.files.getlist("bilder") or [request.files.get("bild")]
-        add_motorcycle_images(motorcycle, uploaded_images)
+        if storage_quota_exceeded(current_user.id, uploaded_images):
+            flash("Speicherlimit von 500 MB erreicht – Bilder wurden nicht gespeichert.", "danger")
+        else:
+            add_motorcycle_images(motorcycle, uploaded_images)
         db.session.commit()
         return redirect(url_for("main.motorcycle_detail", motorrad_id=motorcycle.id))
     return render_template(
@@ -734,10 +759,14 @@ def service_new(motorrad_id):
         fill_service(service)
         db.session.add(service)
         db.session.flush()
-        receipt_path, original_name = save_upload(request.files.get("beleg"), motorrad_id, "receipts")
-        if receipt_path:
-            service.beleg = receipt_path
-            service.beleg_originalname = original_name
+        beleg_file = request.files.get("beleg")
+        if storage_quota_exceeded(current_user.id, [beleg_file]):
+            flash("Speicherlimit von 500 MB erreicht – Beleg wurde nicht gespeichert.", "danger")
+        else:
+            receipt_path, original_name = save_upload(beleg_file, motorrad_id, "receipts")
+            if receipt_path:
+                service.beleg = receipt_path
+                service.beleg_originalname = original_name
         refresh_motorcycle_mileage(motorcycle)
         db.session.commit()
         return redirect(url_for("main.motorcycle_detail", motorrad_id=motorrad_id))
@@ -761,11 +790,15 @@ def service_edit(service_id):
     motorcycle = service.motorcycle
     if request.method == "POST":
         fill_service(service)
-        receipt_path, original_name = save_upload(request.files.get("beleg"), service.motorrad_id, "receipts")
-        if receipt_path:
-            delete_upload_file(service.beleg)
-            service.beleg = receipt_path
-            service.beleg_originalname = original_name
+        beleg_file = request.files.get("beleg")
+        if storage_quota_exceeded(current_user.id, [beleg_file]):
+            flash("Speicherlimit von 500 MB erreicht – Beleg wurde nicht gespeichert.", "danger")
+        else:
+            receipt_path, original_name = save_upload(beleg_file, service.motorrad_id, "receipts")
+            if receipt_path:
+                delete_upload_file(service.beleg)
+                service.beleg = receipt_path
+                service.beleg_originalname = original_name
         refresh_motorcycle_mileage(motorcycle)
         db.session.commit()
         return redirect(url_for("main.motorcycle_detail", motorrad_id=service.motorrad_id))
@@ -1042,6 +1075,52 @@ def resolve_upload_path(relative_path):
     except ValueError:
         abort(400)
     return target
+
+
+def user_storage_usage_bytes(user_id):
+    """Gesamtgröße aller Upload-Dateien, die den Motorrädern des Users gehören."""
+    root = upload_root()
+    motorcycle_ids = [
+        motorcycle_id
+        for (motorcycle_id,) in Motorcycle.query.with_entities(Motorcycle.id)
+        .filter_by(user_id=user_id)
+        .all()
+    ]
+    total = 0
+    for motorcycle_id in motorcycle_ids:
+        folder = root / str(motorcycle_id)
+        if folder.is_dir():
+            for path in folder.rglob("*"):
+                if path.is_file():
+                    try:
+                        total += path.stat().st_size
+                    except OSError:
+                        continue
+    return total
+
+
+def incoming_upload_size(files):
+    """Größe der hochzuladenden Dateien, ohne den Stream zu verbrauchen."""
+    total = 0
+    for file_storage in files:
+        if not file_storage or not file_storage.filename:
+            continue
+        stream = file_storage.stream
+        try:
+            position = stream.tell()
+            stream.seek(0, os.SEEK_END)
+            total += stream.tell()
+            stream.seek(position)
+        except (OSError, ValueError):
+            continue
+    return total
+
+
+def storage_quota_exceeded(user_id, files):
+    incoming = incoming_upload_size(files)
+    if incoming <= 0:
+        return False
+    return user_storage_usage_bytes(user_id) + incoming > MAX_USER_STORAGE_BYTES
 
 
 def delete_upload_file(relative_path):
