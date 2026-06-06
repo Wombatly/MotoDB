@@ -232,13 +232,9 @@ def index():
         query = query.order_by(Motorcycle.marke, Motorcycle.modell)
 
     motorcycles = query.all()
-    active_motorcycles = [motorcycle for motorcycle in motorcycles if motorcycle.aktiv]
-    garage_total_km = sum(motorcycle.kilometerstand or 0 for motorcycle in motorcycles)
     return render_template(
         "motorcycles/index.html",
         motorcycles=motorcycles,
-        active_motorcycles=active_motorcycles,
-        garage_total_km=garage_total_km,
         search=search,
         sort=sort,
     )
