@@ -19,13 +19,6 @@
         <path d="M12 14v2"></path>
       </svg>
     </a>
-    <a class="btn btn-outline-secondary btn-icon" href="{{ url_for('auth.user_export') }}" aria-label="Garage herunterladen" title="Garage herunterladen">
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M12 3v11"></path>
-        <path d="M7 10l5 5 5-5"></path>
-        <path d="M5 19h14"></path>
-      </svg>
-    </a>
     <a class="btn btn-outline-danger btn-icon" href="{{ url_for('auth.user_delete') }}" aria-label="Profil löschen" title="Profil löschen">
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <path d="M3 6h18"></path>
@@ -46,6 +39,19 @@
   <p class="mb-0 mt-3">
     <a href="{{ url_for('main.privacy') }}">Datenschutzhinweise</a>
   </p>
+</section>
+
+<section class="form-panel mt-3">
+  <h2 class="h5 mb-3">Datensicherung</h2>
+  <p class="text-secondary mb-3">
+    Lade deine kompletten Daten – Motorräder, Serviceeinträge, technische Daten,
+    Checklisten, Bilder, Belege und Dokumente – als ZIP-Datei direkt auf dein
+    eigenes Gerät herunter. So hast du jederzeit ein lokales Backup, das nur dir
+    gehört und unabhängig vom Server ist.
+  </p>
+  <a class="btn btn-primary" href="{{ url_for('auth.user_export') }}">
+    Daten auf mein Gerät sichern
+  </a>
 </section>
 
 {% if current_user.is_admin %}
