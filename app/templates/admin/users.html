@@ -70,6 +70,7 @@
         <div class="user-row__meta">
           <span>{{ "Admin" if user.is_admin else "Nutzer" }}</span>
           <span>{{ user.motorcycles|length }} Maschinen</span>
+          <span>Speicher: {{ user_storage[user.id]|filesize }} / {{ storage_limit|filesize }}</span>
           <span>Letzter Login: {{ user.last_login|datetime_de }}</span>
           <span>Angelegt: {{ user.created_at|date_de }}</span>
         </div>
