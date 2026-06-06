@@ -10,20 +10,6 @@
 </div>
 
 {% if motorcycles %}
-  <section class="overview-strip mb-3" aria-label="Garage Übersicht">
-    <div>
-      <span>Maschinen</span>
-      <strong>{{ motorcycles|length }}</strong>
-    </div>
-    <div>
-      <span>Aktiv</span>
-      <strong>{{ active_motorcycles|length }}</strong>
-    </div>
-    <div>
-      <span>Gesamt km</span>
-      <strong>{{ garage_total_km|km }}</strong>
-    </div>
-  </section>
   <div class="motorcycle-grid">
     {% for motorcycle in motorcycles %}
       <article class="motorcycle-card">
