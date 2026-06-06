@@ -23,9 +23,6 @@
             <article class="image-manager__slide{% if loop.first %} is-active{% endif %}" data-image-manager-slide {% if not loop.first %}hidden{% endif %}>
               <div class="edit-image-preview">
                 <img src="{{ url_for('main.uploaded_file', filename=image.path) }}" alt="{{ motorcycle.marke }} {{ motorcycle.modell }} Bild {{ loop.index }}">
-                <span class="image-manager__badge{% if image.path == motorcycle.bild %} is-primary{% endif %}">
-                  {{ "Titelbild" if image.path == motorcycle.bild else "Galerie" }}
-                </span>
               </div>
               <div class="image-manager__actions">
                 {% if image.path == motorcycle.bild %}
