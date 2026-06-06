@@ -319,14 +319,16 @@ a {
   color: var(--text);
   display: block;
   font: inherit;
+  font-weight: 700;
   min-height: 2.65rem;
   padding: .55rem .7rem;
   width: 100%;
 }
 
 .form-label {
+  color: var(--text-muted);
   display: block;
-  font-weight: 650;
+  font-weight: 400;
   margin-bottom: .35rem;
 }
 
