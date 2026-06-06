@@ -913,12 +913,8 @@ a {
 }
 
 .gallery-viewer__dialog {
-  display: grid;
-  gap: 1rem;
-  grid-template-rows: minmax(0, 1fr) auto;
   inset: 0;
-  min-height: 100%;
-  padding: 1rem 1rem 1.25rem;
+  padding: 0;
   position: absolute;
 }
 
@@ -926,45 +922,57 @@ a {
   position: absolute;
   right: 1rem;
   top: 1rem;
-  z-index: 2;
+  z-index: 3;
 }
 
 .gallery-viewer__stage {
-  align-items: center;
-  display: grid;
-  gap: .75rem;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  height: 100%;
-  min-height: 0;
-}
-
-.gallery-viewer__stage--single {
-  grid-template-columns: minmax(0, 1fr);
+  inset: 0;
+  position: absolute;
 }
 
 .gallery-viewer__slide {
   align-items: center;
   display: flex;
+  inset: 0;
   justify-content: center;
   margin: 0;
-  min-height: 0;
+  position: absolute;
 }
 
 .gallery-viewer__slide img {
-  border-radius: 18px;
-  max-height: min(68vh, 820px);
+  height: 100%;
+  max-height: 100%;
   max-width: 100%;
   object-fit: contain;
-  width: auto;
+  width: 100%;
 }
 
 .gallery-viewer__nav {
   background: rgb(255 250 244 / 88%);
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 3;
+}
+
+.gallery-viewer__nav--prev {
+  left: 1rem;
+}
+
+.gallery-viewer__nav--next {
+  right: 1rem;
 }
 
 .gallery-viewer__footer {
+  background: linear-gradient(to top, rgb(17 19 21 / 82%), rgb(17 19 21 / 0%));
+  bottom: 0;
   display: grid;
   gap: .75rem;
+  left: 0;
+  padding: 2.75rem 1rem 1.25rem;
+  position: absolute;
+  right: 0;
+  z-index: 3;
 }
 
 .gallery-viewer__thumbs {
@@ -1523,20 +1531,19 @@ a {
   }
 
   .gallery-viewer__dialog {
-    padding: .75rem .75rem 1rem;
+    padding: 0;
   }
 
-  .gallery-viewer__stage {
-    gap: .5rem;
-    grid-template-columns: 2.65rem minmax(0, 1fr) 2.65rem;
+  .gallery-viewer__nav--prev {
+    left: .5rem;
   }
 
-  .gallery-viewer__stage--single {
-    grid-template-columns: minmax(0, 1fr);
+  .gallery-viewer__nav--next {
+    right: .5rem;
   }
 
   .gallery-viewer__slide img {
-    max-height: 56vh;
+    max-height: 100%;
   }
 
   .gallery-viewer__thumb img {
