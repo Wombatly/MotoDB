@@ -242,7 +242,7 @@ class SecurityTestCase(unittest.TestCase):
             self.assertEqual(response.status_code, 200)
             self.assertIn(b"Einstellungen", response.data)
             self.assertIn(b"Profil l", response.data)
-            self.assertIn(b"Garage herunterladen", response.data)
+            self.assertIn(b"/user/export", response.data)
             self.assertIn(b"Vorlagen", response.data)
             self.assertIn(b"Checklisten", response.data)
             self.assertIn(b"Datenblatt", response.data)
