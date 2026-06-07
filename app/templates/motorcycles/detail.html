@@ -90,7 +90,7 @@
     <div class="history-list">
       {% for item in history %}
         {% if item.kind == "service" %}
-          <a class="history-row" href="{{ url_for('main.service_edit', service_id=item.id) }}">
+          <div class="history-row">
             <span class="history-row__title">{{ item.titel }}</span>
             <span>
               {{ item.date|date_de }}
@@ -99,16 +99,16 @@
             {% if item.kosten %}
               <strong>{{ item.kosten|currency }}</strong>
             {% endif %}
-          </a>
+          </div>
         {% else %}
-          <a class="history-row" href="{{ url_for('main.checklist_edit', checklist_id=item.id) }}">
+          <div class="history-row">
             <span class="history-row__title">{{ item.titel }}</span>
             <span>
               {{ item.date|date_de }}
               {% if item.kilometerstand %} · {{ item.kilometerstand|km }}{% endif %}
               {% if item.intervall_km %} · {{ item.intervall_km|km }}{% endif %}
             </span>
-          </a>
+          </div>
         {% endif %}
       {% endfor %}
     </div>
