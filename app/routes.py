@@ -95,19 +95,19 @@ DEFAULT_CHECKLIST_CSV = "\n".join(
     ]
 )
 
-CHECKLIST_TEMPLATE_README = """# Checklisten-Vorlage
+CHECKLIST_TEMPLATE_README = """Checklisten-Vorlage
 
-Datei im ZIP: `checklisten.csv`
+Datei im ZIP: checklisten.csv
 
 Kurzanleitung:
 - In die App gehen: Profil > Upload > Checklisten.
 - Titel, Motorrad und Intervall in der App setzen.
-- Die Datei bei `Punkteliste einlesen` auswählen.
+- Die Datei bei "Punkteliste einlesen" auswählen.
 - Dateiname ist egal. Wichtig ist der Inhalt der Spalten.
 
 Spalten:
-- `Pruefpunkt`: Der Text der Aufgabe. Daraus wird später eine Checkbox im Service.
-- `Kommentar`: Optionaler Hinweis zur Aufgabe.
+- Pruefpunkt: Der Text der Aufgabe. Daraus wird später eine Checkbox im Service.
+- Kommentar: Optionaler Hinweis zur Aufgabe.
 
 Du kannst Punkte ergänzen, löschen oder umbenennen.
 """
@@ -124,9 +124,9 @@ DEFAULT_TECHNICAL_CSV = "\n".join(
     ]
 )
 
-TECHNICAL_TEMPLATE_README = """# Datenblatt-Vorlage
+TECHNICAL_TEMPLATE_README = """Datenblatt-Vorlage
 
-Datei im ZIP: `datenblatt.csv`
+Datei im ZIP: datenblatt.csv
 
 Kurzanleitung:
 - In die App gehen: Profil > Upload > Datenblatt.
@@ -135,10 +135,10 @@ Kurzanleitung:
 - Dateiname ist egal. Wichtig ist der Inhalt der Spalten.
 
 Spalten:
-- `Kategorie`: Gruppiert die Angaben, zum Beispiel Motor, Reifen oder Antrieb.
-- `Eintrag`: Name des technischen Werts, zum Beispiel Hubraum oder Leistung.
-- `Wert`: Der konkrete Wert, zum Beispiel 583 oder 50.
-- `Einheit`: Optional, zum Beispiel ccm, PS, Nm oder leer lassen.
+- Kategorie: Gruppiert die Angaben, zum Beispiel Motor, Reifen oder Antrieb.
+- Eintrag: Name des technischen Werts, zum Beispiel Hubraum oder Leistung.
+- Wert: Der konkrete Wert, zum Beispiel 583 oder 50.
+- Einheit: Optional, zum Beispiel ccm, PS, Nm oder leer lassen.
 
 Du kannst Kategorien, Einträge, Werte und Einheiten frei anpassen.
 """
@@ -411,7 +411,7 @@ def checklist_csv_template():
         "checklisten_vorlage.zip",
         {
             "checklisten.csv": DEFAULT_CHECKLIST_CSV + "\n",
-            "README.md": CHECKLIST_TEMPLATE_README,
+            "README.txt": CHECKLIST_TEMPLATE_README,
         },
     )
 
@@ -450,7 +450,7 @@ def technical_csv_template():
         "datenblatt_vorlage.zip",
         {
             "datenblatt.csv": DEFAULT_TECHNICAL_CSV + "\n",
-            "README.md": TECHNICAL_TEMPLATE_README,
+            "README.txt": TECHNICAL_TEMPLATE_README,
         },
     )
 
