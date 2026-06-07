@@ -48,7 +48,16 @@ from app.utils import (
 
 bp = Blueprint("main", __name__)
 
-MAX_USER_STORAGE_BYTES = 500 * 1024 * 1024  # 500 MB Speicherlimit pro Account
+def _max_storage_mb():
+    """Speicherlimit pro Account in MB, konfigurierbar über MOTODB_MAX_STORAGE_MB."""
+    try:
+        value = int(os.environ.get("MOTODB_MAX_STORAGE_MB", "500"))
+    except (TypeError, ValueError):
+        return 500
+    return value if value > 0 else 500
+
+
+MAX_USER_STORAGE_BYTES = _max_storage_mb() * 1024 * 1024  # Limit pro Account
 
 
 def require_motorcycle_ownership(motorcycle_id):
