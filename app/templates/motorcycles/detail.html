@@ -85,42 +85,35 @@
 </section>
 
 <section class="mb-4">
-  <h2 class="h5 mb-3">Letzte Aktivität</h2>
-  {% if services %}
-    <div class="history-list mb-4">
-      {% for service in services[:5] %}
-        <a class="history-row" href="{{ url_for('main.service_edit', service_id=service.id) }}">
-          <span class="history-row__title">{{ service.titel or "Service" }}</span>
-          <span>
-            {{ service.datum|date_de }}
-            {% if service.kilometerstand %} · {{ service.kilometerstand|km }}{% endif %}
-          </span>
-          {% if service.kosten %}
-            <strong>{{ service.kosten|currency }}</strong>
-          {% endif %}
-        </a>
-      {% endfor %}
-    </div>
-  {% else %}
-    <p class="text-secondary">Noch kein Service eingetragen.</p>
-  {% endif %}
-
   <h2 class="h5 mb-3">Service-Historie</h2>
-  {% if checklist_records %}
+  {% if history %}
     <div class="history-list">
-      {% for checklist in checklist_records %}
-        <a class="history-row" href="{{ url_for('main.checklist_edit', checklist_id=checklist.id) }}">
-          <span class="history-row__title">{{ checklist.titel }}</span>
-          <span>
-            {{ checklist.datum|date_de }}
-            {% if checklist.kilometerstand %} · {{ checklist.kilometerstand|km }}{% endif %}
-            {% if checklist.intervall_km %} · {{ checklist.intervall_km|km }}{% endif %}
-          </span>
-        </a>
+      {% for item in history %}
+        {% if item.kind == "service" %}
+          <a class="history-row" href="{{ url_for('main.service_edit', service_id=item.id) }}">
+            <span class="history-row__title">{{ item.titel }}</span>
+            <span>
+              {{ item.date|date_de }}
+              {% if item.kilometerstand %} · {{ item.kilometerstand|km }}{% endif %}
+            </span>
+            {% if item.kosten %}
+              <strong>{{ item.kosten|currency }}</strong>
+            {% endif %}
+          </a>
+        {% else %}
+          <a class="history-row" href="{{ url_for('main.checklist_edit', checklist_id=item.id) }}">
+            <span class="history-row__title">{{ item.titel }}</span>
+            <span>
+              {{ item.date|date_de }}
+              {% if item.kilometerstand %} · {{ item.kilometerstand|km }}{% endif %}
+              {% if item.intervall_km %} · {{ item.intervall_km|km }}{% endif %}
+            </span>
+          </a>
+        {% endif %}
       {% endfor %}
     </div>
   {% else %}
-    <p class="text-secondary">Noch keine Checkliste abgeschlossen.</p>
+    <p class="text-secondary">Noch nichts eingetragen.</p>
   {% endif %}
 </section>
 

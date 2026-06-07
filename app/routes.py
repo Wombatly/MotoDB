@@ -508,6 +508,30 @@ def motorcycle_detail(motorrad_id):
         .all()
     )
     checklist_records = unique_checklist_records(checklist_records)
+
+    history = []
+    for service in services:
+        history.append({
+            "kind": "service",
+            "date": service.datum,
+            "id": service.id,
+            "titel": service.titel or "Service",
+            "kilometerstand": service.kilometerstand,
+            "kosten": service.kosten,
+            "intervall_km": None,
+        })
+    for record in checklist_records:
+        history.append({
+            "kind": "checklist",
+            "date": record.datum or (record.completed_at.date() if record.completed_at else None),
+            "id": record.id,
+            "titel": record.titel,
+            "kilometerstand": record.kilometerstand,
+            "kosten": None,
+            "intervall_km": record.intervall_km,
+        })
+    history.sort(key=lambda item: (item["date"] or date.min), reverse=True)
+
     return render_template(
         "motorcycles/detail.html",
         motorcycle=motorcycle,
@@ -519,6 +543,7 @@ def motorcycle_detail(motorrad_id):
         technical_specs=technical_specs,
         checklist_templates=checklist_templates,
         checklist_records=checklist_records,
+        history=history,
     )
 
 
