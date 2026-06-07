@@ -59,7 +59,13 @@
             </div>
             <strong>{{ checklist.items|selectattr("erledigt")|list|length }}/{{ checklist.items|length }}</strong>
           </div>
-          <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('main.checklist_edit', checklist_id=checklist.id) }}">Anzeigen</a>
+          <div class="d-flex gap-2 flex-wrap">
+            <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('main.checklist_edit', checklist_id=checklist.id) }}">Anzeigen</a>
+            <form method="post" action="{{ url_for('main.checklist_delete', checklist_id=checklist.id) }}" data-confirm="Diesen abgeschlossenen Datensatz wirklich löschen?">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-sm btn-outline-danger" type="submit">Löschen</button>
+            </form>
+          </div>
         </article>
       {% endfor %}
     </div>
