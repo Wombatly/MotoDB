@@ -112,6 +112,7 @@
                 <button class="btn btn-sm btn-outline-danger" type="submit">Löschen</button>
               </form>
             {% else %}
+              <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('main.service_detail', service_id=item.id) }}">Öffnen</a>
               <form method="post" action="{{ url_for('main.service_delete', service_id=item.id) }}" data-confirm="Diesen Eintrag wirklich löschen?">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button class="btn btn-sm btn-outline-danger" type="submit">Löschen</button>

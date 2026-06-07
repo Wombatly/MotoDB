@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}{{ service.titel or "Service" }}{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between gap-3 mb-3">
+  <div>
+    <h1 class="h3 mb-1">{{ service.titel or "Service" }}</h1>
+    <p class="text-secondary mb-0">{{ motorcycle.marke }} {{ motorcycle.modell }}</p>
+  </div>
+  <a class="btn btn-outline-secondary" href="{{ url_for('main.motorcycle_detail', motorrad_id=motorcycle.id) }}">Zurück</a>
+</div>
+
+<section class="form-panel">
+  <div class="mb-3">
+    <span class="form-label">Kategorie</span>
+    <p class="mb-0">{{ service.kategorie or "-" }}</p>
+  </div>
+  <div class="mb-3">
+    <span class="form-label">Datum</span>
+    <p class="mb-0">{{ service.datum|date_de }}</p>
+  </div>
+  <div class="mb-3">
+    <span class="form-label">Kilometerstand</span>
+    <p class="mb-0">{{ service.kilometerstand|km }}</p>
+  </div>
+  <div class="mb-3">
+    <span class="form-label">Kosten</span>
+    <p class="mb-0">{{ service.kosten|currency }}</p>
+  </div>
+  <div class="mb-3">
+    <span class="form-label">Beschreibung</span>
+    <p class="mb-0">{{ service.beschreibung or "-" }}</p>
+  </div>
+  {% if service.naechster_service_km or service.naechster_service_datum %}
+    <div class="mb-3">
+      <span class="form-label">Nächster Service</span>
+      <p class="mb-0">
+        {% if service.naechster_service_km %}{{ service.naechster_service_km|km }}{% endif %}
+        {% if service.naechster_service_datum %} · {{ service.naechster_service_datum|date_de }}{% endif %}
+      </p>
+    </div>
+  {% endif %}
+  {% if service.beleg %}
+    <div class="mb-0">
+      <span class="form-label">Beleg</span>
+      <p class="mb-0">
+        <a href="{{ url_for('main.uploaded_file', filename=service.beleg) }}">{{ service.beleg_originalname or "Beleg öffnen" }}</a>
+      </p>
+    </div>
+  {% endif %}
+</section>
+
+<div class="d-flex gap-2 mt-4">
+  <form method="post" action="{{ url_for('main.service_delete', service_id=service.id) }}" data-confirm="Diesen Eintrag wirklich löschen?">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button class="btn btn-outline-danger" type="submit">Löschen</button>
+  </form>
+</div>
+{% endblock %}

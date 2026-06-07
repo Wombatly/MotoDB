@@ -845,6 +845,15 @@ def service_edit(service_id):
     )
 
 
+@bp.route("/service/<int:service_id>/ansicht")
+@login_required
+def service_detail(service_id):
+    service = ServiceEntry.query.get_or_404(service_id)
+    if service.user_id != current_user.id:
+        abort(403)
+    return render_template("service/detail.html", service=service, motorcycle=service.motorcycle)
+
+
 @bp.route("/service/<int:service_id>/loeschen", methods=["POST"])
 @login_required
 def service_delete(service_id):
