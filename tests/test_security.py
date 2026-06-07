@@ -345,25 +345,25 @@ class SecurityTestCase(unittest.TestCase):
             self.assertEqual(checklist_response.status_code, 200)
             self.assertEqual(checklist_response.mimetype, "application/zip")
             with zipfile.ZipFile(BytesIO(checklist_response.data)) as archive:
-                self.assertEqual(set(archive.namelist()), {"checklisten.csv", "README.md"})
+                self.assertEqual(set(archive.namelist()), {"checklisten.csv", "README.txt"})
                 checklist_csv = archive.read("checklisten.csv")
-                checklist_readme = archive.read("README.md").decode("utf-8")
+                checklist_readme = archive.read("README.txt").decode("utf-8")
                 self.assertIn(b"Pruefpunkt;Kommentar", checklist_csv)
                 self.assertIn(b"Oelstand pruefen;", checklist_csv)
                 self.assertNotIn(b"Motorrad;Titel;km;Intervall", checklist_csv)
-                self.assertIn("Datei im ZIP: `checklisten.csv`", checklist_readme)
+                self.assertIn("Datei im ZIP: checklisten.csv", checklist_readme)
                 self.assertIn("Punkteliste einlesen", checklist_readme)
 
             self.assertEqual(technical_response.status_code, 200)
             self.assertEqual(technical_response.mimetype, "application/zip")
             with zipfile.ZipFile(BytesIO(technical_response.data)) as archive:
-                self.assertEqual(set(archive.namelist()), {"datenblatt.csv", "README.md"})
+                self.assertEqual(set(archive.namelist()), {"datenblatt.csv", "README.txt"})
                 technical_csv = archive.read("datenblatt.csv")
-                technical_readme = archive.read("README.md").decode("utf-8")
+                technical_readme = archive.read("README.txt").decode("utf-8")
                 self.assertIn(b"Kategorie;Eintrag;Wert;Einheit", technical_csv)
                 self.assertIn(b"Motor;Hubraum;583;ccm", technical_csv)
                 self.assertNotIn(b"Quelle", technical_csv)
-                self.assertIn("Datei im ZIP: `datenblatt.csv`", technical_readme)
+                self.assertIn("Datei im ZIP: datenblatt.csv", technical_readme)
                 self.assertIn("Einheit", technical_readme)
 
     def test_csv_checklists_are_grouped_by_interval_in_service_form(self):

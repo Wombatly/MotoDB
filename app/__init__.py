@@ -5,7 +5,7 @@ from pathlib import Path
 from flask import Flask, request
 from flask_wtf.csrf import CSRFError, CSRFProtect
 from flask_sqlalchemy import SQLAlchemy
-from flask_login import LoginManager
+from flask_login import LoginManager, current_user
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 
@@ -99,6 +99,11 @@ def create_app():
                 "Strict-Transport-Security",
                 "max-age=31536000",
             )
+        # Angemeldete Seiten nicht im Browser-/Back-Forward-Cache ablegen,
+        # damit der Zurueck-Button keine zwischengespeicherte Seite zeigt.
+        if current_user.is_authenticated and not request.path.startswith("/static/"):
+            response.headers["Cache-Control"] = "no-store, max-age=0, must-revalidate"
+            response.headers["Pragma"] = "no-cache"
         return response
 
     @app.errorhandler(CSRFError)
