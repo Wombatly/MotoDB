@@ -28,7 +28,6 @@
             </div>
           </div>
           <div class="d-flex gap-2 flex-wrap">
-            <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('main.checklist_edit', checklist_id=checklist.id) }}">Ausfüllen</a>
             <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('main.checklist_template_edit', checklist_id=checklist.id) }}">Bearbeiten</a>
             <form method="post" action="{{ url_for('main.checklist_delete', checklist_id=checklist.id) }}" data-confirm="Diese Checkliste wirklich löschen?">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
