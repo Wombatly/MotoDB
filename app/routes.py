@@ -767,6 +767,9 @@ def checklist_delete(checklist_id):
     motorrad_id = checklist.motorrad_id
     db.session.delete(checklist)
     db.session.commit()
+    next_url = request.form.get("next", "")
+    if next_url.startswith("/") and not next_url.startswith("//"):
+        return redirect(next_url)
     return redirect(url_for("main.checklist_index", motorrad_id=motorrad_id))
 
 

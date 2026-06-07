@@ -87,29 +87,38 @@
 <section class="mb-4">
   <h2 class="h5 mb-3">Service-Historie</h2>
   {% if history %}
-    <div class="history-list">
+    <div class="service-list">
       {% for item in history %}
-        {% if item.kind == "service" %}
-          <div class="history-row">
-            <span class="history-row__title">{{ item.titel }}</span>
-            <span>
-              {{ item.date|date_de }}
-              {% if item.kilometerstand %} · {{ item.kilometerstand|km }}{% endif %}
-            </span>
+        <article class="service-entry">
+          <div class="d-flex justify-content-between gap-3">
+            <div>
+              <h3 class="h6 mb-1">{{ item.titel }}</h3>
+              <p class="text-secondary mb-2">
+                {{ item.date|date_de }}
+                {% if item.kilometerstand %} · {{ item.kilometerstand|km }}{% endif %}
+                {% if item.intervall_km %} · {{ item.intervall_km|km }}{% endif %}
+              </p>
+            </div>
             {% if item.kosten %}
               <strong>{{ item.kosten|currency }}</strong>
             {% endif %}
           </div>
-        {% else %}
-          <div class="history-row">
-            <span class="history-row__title">{{ item.titel }}</span>
-            <span>
-              {{ item.date|date_de }}
-              {% if item.kilometerstand %} · {{ item.kilometerstand|km }}{% endif %}
-              {% if item.intervall_km %} · {{ item.intervall_km|km }}{% endif %}
-            </span>
+          <div class="d-flex gap-2 flex-wrap">
+            {% if item.kind == "checklist" %}
+              <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('main.checklist_edit', checklist_id=item.id) }}">Öffnen</a>
+              <form method="post" action="{{ url_for('main.checklist_delete', checklist_id=item.id) }}" data-confirm="Diesen Eintrag wirklich löschen?">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="next" value="{{ url_for('main.motorcycle_detail', motorrad_id=motorcycle.id) }}">
+                <button class="btn btn-sm btn-outline-danger" type="submit">Löschen</button>
+              </form>
+            {% else %}
+              <form method="post" action="{{ url_for('main.service_delete', service_id=item.id) }}" data-confirm="Diesen Eintrag wirklich löschen?">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn btn-sm btn-outline-danger" type="submit">Löschen</button>
+              </form>
+            {% endif %}
           </div>
-        {% endif %}
+        </article>
       {% endfor %}
     </div>
   {% else %}
