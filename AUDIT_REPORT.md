@@ -71,6 +71,26 @@ muss `MOTODB_PUBLIC_HOSTING=true` mit HTTPS gesetzt werden (erzwingt Secure-Cook
 HSTS, CSRF-über-HTTP-Block). `compose.yaml`/`.env` und der Laufzeit-Container
 sollten konsolidiert werden, damit beide denselben Modus beschreiben.
 
+### Offen: Kein Sitzungs-Timeout / kein automatisches Abmelden (für öffentliche Nutzung)
+
+Fundstelle: `app/__init__.py` (Session-Konfiguration), `app/auth.py` (`login_user`)
+
+Sitzungen laufen aktuell nur bis zum Schließen des Browsers (Session-Cookie ohne
+`PERMANENT_SESSION_LIFETIME`/Idle-Timeout). Manche Browser behalten Session-Cookies
+über Neustarts hinweg ("Tabs wiederherstellen"), wodurch die Anmeldung lange gültig
+bleiben kann.
+
+Umgesetzt ist bereits: angemeldete Seiten werden mit `Cache-Control: no-store`
+ausgeliefert (`app/__init__.py`, `after_request`), sodass der Zurück-Button keine
+zwischengespeicherte angemeldete Seite zeigt. Das verhindert aber **kein** echtes
+Abmelden – die Sitzung bleibt gültig.
+
+Empfehlung für ein öffentliches / auf geteilten Geräten genutztes Deployment:
+**automatisches Abmelden nach Inaktivität** (z. B. 5–15 Minuten) ergänzen, z. B. über
+`PERMANENT_SESSION_LIFETIME` mit `session.permanent = True` und sliding Refresh, oder
+clientseitig per Inaktivitäts-Timer + Logout-Beacon. Optional zusätzlich die
+Sitzungsdauer serverseitig begrenzen. **Status: bewusst auf später verschoben.**
+
 ## Performance und Skalierung
 
 ### `latest_service_mileage` lädt alle Kandidaten in Python
