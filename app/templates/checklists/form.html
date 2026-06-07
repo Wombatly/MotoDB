@@ -33,13 +33,17 @@
       <label class="form-label" for="titel">Titel</label>
       <input class="form-control" id="titel" name="titel" value="{{ checklist.titel if checklist else preset.titel or '' }}" required>
     </div>
-    <div class="col-6 col-md-2">
-      <label class="form-label" for="intervall_km">km</label>
+  </div>
+
+  <h2 class="h5 mt-4 mb-3">Intervall</h2>
+  <div class="row g-3">
+    <div class="col-6 col-md-3">
+      <label class="form-label" for="intervall_km">Kilometer</label>
       <input class="form-control number-input" id="intervall_km" name="intervall_km" inputmode="numeric" data-number-suffix="km" value="{{ checklist.intervall_km if checklist else preset.intervall_km or '' }}">
     </div>
-    <div class="col-6 col-md-2">
-      <label class="form-label" for="intervall_monate">Intervall</label>
-      <input class="form-control number-input" id="intervall_monate" name="intervall_monate" inputmode="numeric" value="{{ checklist.intervall_monate if checklist else preset.intervall_monate or '' }}">
+    <div class="col-6 col-md-3">
+      <label class="form-label" for="intervall_monate">Monate</label>
+      <input class="form-control number-input" id="intervall_monate" name="intervall_monate" inputmode="numeric" data-number-suffix="Monate" value="{{ checklist.intervall_monate if checklist else preset.intervall_monate or '' }}">
     </div>
   </div>
 
