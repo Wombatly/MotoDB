@@ -47,6 +47,28 @@ Einmal abmelden und neu anmelden. Test:
 docker run hello-world
 ```
 
+### Memory-Cgroups aktivieren
+
+Raspberry Pi OS deaktiviert den Memory-Controller des Kernels standardmäßig.
+Ohne ihn zeigt `docker stats` für alle Container `0B` Speicher an und
+RAM-Limits für Container (z. B. `--memory`) werden ignoriert. Aktivieren:
+
+```bash
+sudo cp /boot/firmware/cmdline.txt /boot/firmware/cmdline.txt.backup
+sudo sed -i '1s/$/ cgroup_enable=memory cgroup_memory=1/' /boot/firmware/cmdline.txt
+sudo reboot
+```
+
+Wichtig: `cmdline.txt` muss eine einzige Zeile bleiben, die Parameter werden
+am Zeilenende angehängt.
+
+Nach dem Neustart prüfen:
+
+```bash
+cat /sys/fs/cgroup/cgroup.controllers   # muss "memory" enthalten
+docker stats --no-stream                # zeigt jetzt echte RAM-Werte
+```
+
 ## 3. Server-Verzeichnisse
 
 ```bash
