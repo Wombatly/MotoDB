@@ -789,6 +789,41 @@ def service_new(motorrad_id):
         .all()
     )
     if request.method == "POST":
+        service_art = request.form.get("service_art", "free")
+        if service_art.startswith("checklist:"):
+            template_id = parse_int(service_art.split(":")[1])
+            template = ServiceChecklist.query.get(template_id) if template_id else None
+            if template and template.motorrad_id == motorrad_id and template.user_id == current_user.id:
+                record = ServiceChecklist(
+                    motorrad_id=motorrad_id,
+                    user_id=current_user.id,
+                    titel=request.form.get("titel") or template.titel,
+                    intervall_km=template.intervall_km,
+                    intervall_monate=template.intervall_monate,
+                    datum=parse_date(request.form.get("datum")) or date.today(),
+                    kilometerstand=parse_int(request.form.get("kilometerstand")),
+                    anmerkungen=request.form.get("beschreibung"),
+                    is_template=False,
+                    source_template_id=template.id,
+                    completed_at=datetime.utcnow(),
+                )
+                db.session.add(record)
+                db.session.flush()
+                completed_ids = set(request.form.getlist(f"checklist_erledigt_{template.id}"))
+                for item in template.items:
+                    db.session.add(
+                        ServiceChecklistItem(
+                            checklist_id=record.id,
+                            position=item.position,
+                            text=item.text,
+                            kommentar_vorlage=item.kommentar_vorlage,
+                            erledigt=str(item.id) in completed_ids,
+                            anmerkung=request.form.get(f"checklist_anmerkung_{item.id}"),
+                        )
+                    )
+                refresh_motorcycle_mileage(motorcycle)
+                db.session.commit()
+                return redirect(url_for("main.motorcycle_detail", motorrad_id=motorrad_id))
         fill_service(service)
         db.session.add(service)
         db.session.flush()
@@ -994,25 +1029,9 @@ def api_sync():
             continue
         if motorcycle.user_id != current_user.id:
             continue
-        service = ServiceEntry(
-            motorrad_id=motorcycle.id,
-            user_id=current_user.id,
-            titel=item.get("titel") or template.titel,
-            datum=parse_date(item.get("datum")) or date.today(),
-            kilometerstand=parse_int(item.get("kilometerstand")),
-            beschreibung=item.get("beschreibung"),
-            kosten=parse_int(item.get("kosten")),
-            kategorie=item.get("kategorie") or "Wartung / Service",
-            naechster_service_km=parse_int(item.get("naechster_service_km")),
-            naechster_service_datum=parse_date(item.get("naechster_service_datum")),
-        )
-        db.session.add(service)
-        db.session.flush()
         record = create_checklist_record_from_payload(template, item)
         refresh_motorcycle_mileage(motorcycle)
-        checklist_services.append(
-            {"service": serialize_service(service), "checklist_id": record.id}
-        )
+        checklist_services.append({"checklist_id": record.id})
     db.session.commit()
     return jsonify({"created": created, "checklist_services": checklist_services})
 
