@@ -508,6 +508,30 @@ def motorcycle_detail(motorrad_id):
         .all()
     )
     checklist_records = unique_checklist_records(checklist_records)
+
+    history = []
+    for service in services:
+        history.append({
+            "kind": "service",
+            "date": service.datum,
+            "id": service.id,
+            "titel": service.titel or "Service",
+            "kilometerstand": service.kilometerstand,
+            "kosten": service.kosten,
+            "intervall_km": None,
+        })
+    for record in checklist_records:
+        history.append({
+            "kind": "checklist",
+            "date": record.datum or (record.completed_at.date() if record.completed_at else None),
+            "id": record.id,
+            "titel": record.titel,
+            "kilometerstand": record.kilometerstand,
+            "kosten": None,
+            "intervall_km": record.intervall_km,
+        })
+    history.sort(key=lambda item: (item["date"] or date.min), reverse=True)
+
     return render_template(
         "motorcycles/detail.html",
         motorcycle=motorcycle,
@@ -519,6 +543,7 @@ def motorcycle_detail(motorrad_id):
         technical_specs=technical_specs,
         checklist_templates=checklist_templates,
         checklist_records=checklist_records,
+        history=history,
     )
 
 
@@ -742,6 +767,9 @@ def checklist_delete(checklist_id):
     motorrad_id = checklist.motorrad_id
     db.session.delete(checklist)
     db.session.commit()
+    next_url = request.form.get("next", "")
+    if next_url.startswith("/") and not next_url.startswith("//"):
+        return redirect(next_url)
     return redirect(url_for("main.checklist_index", motorrad_id=motorrad_id))
 
 
@@ -761,6 +789,41 @@ def service_new(motorrad_id):
         .all()
     )
     if request.method == "POST":
+        service_art = request.form.get("service_art", "free")
+        if service_art.startswith("checklist:"):
+            template_id = parse_int(service_art.split(":")[1])
+            template = ServiceChecklist.query.get(template_id) if template_id else None
+            if template and template.motorrad_id == motorrad_id and template.user_id == current_user.id:
+                record = ServiceChecklist(
+                    motorrad_id=motorrad_id,
+                    user_id=current_user.id,
+                    titel=request.form.get("titel") or template.titel,
+                    intervall_km=template.intervall_km,
+                    intervall_monate=template.intervall_monate,
+                    datum=parse_date(request.form.get("datum")) or date.today(),
+                    kilometerstand=parse_int(request.form.get("kilometerstand")),
+                    anmerkungen=request.form.get("beschreibung"),
+                    is_template=False,
+                    source_template_id=template.id,
+                    completed_at=datetime.utcnow(),
+                )
+                db.session.add(record)
+                db.session.flush()
+                completed_ids = set(request.form.getlist(f"checklist_erledigt_{template.id}"))
+                for item in template.items:
+                    db.session.add(
+                        ServiceChecklistItem(
+                            checklist_id=record.id,
+                            position=item.position,
+                            text=item.text,
+                            kommentar_vorlage=item.kommentar_vorlage,
+                            erledigt=str(item.id) in completed_ids,
+                            anmerkung=request.form.get(f"checklist_anmerkung_{item.id}"),
+                        )
+                    )
+                refresh_motorcycle_mileage(motorcycle)
+                db.session.commit()
+                return redirect(url_for("main.motorcycle_detail", motorrad_id=motorrad_id))
         fill_service(service)
         db.session.add(service)
         db.session.flush()
@@ -815,6 +878,15 @@ def service_edit(service_id):
         checklist_templates=[],
         title="Service bearbeiten",
     )
+
+
+@bp.route("/service/<int:service_id>/ansicht")
+@login_required
+def service_detail(service_id):
+    service = ServiceEntry.query.get_or_404(service_id)
+    if service.user_id != current_user.id:
+        abort(403)
+    return render_template("service/detail.html", service=service, motorcycle=service.motorcycle)
 
 
 @bp.route("/service/<int:service_id>/loeschen", methods=["POST"])
@@ -957,25 +1029,9 @@ def api_sync():
             continue
         if motorcycle.user_id != current_user.id:
             continue
-        service = ServiceEntry(
-            motorrad_id=motorcycle.id,
-            user_id=current_user.id,
-            titel=item.get("titel") or template.titel,
-            datum=parse_date(item.get("datum")) or date.today(),
-            kilometerstand=parse_int(item.get("kilometerstand")),
-            beschreibung=item.get("beschreibung"),
-            kosten=parse_int(item.get("kosten")),
-            kategorie=item.get("kategorie") or "Wartung / Service",
-            naechster_service_km=parse_int(item.get("naechster_service_km")),
-            naechster_service_datum=parse_date(item.get("naechster_service_datum")),
-        )
-        db.session.add(service)
-        db.session.flush()
         record = create_checklist_record_from_payload(template, item)
         refresh_motorcycle_mileage(motorcycle)
-        checklist_services.append(
-            {"service": serialize_service(service), "checklist_id": record.id}
-        )
+        checklist_services.append({"checklist_id": record.id})
     db.session.commit()
     return jsonify({"created": created, "checklist_services": checklist_services})
 
