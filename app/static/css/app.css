@@ -1226,53 +1226,46 @@ a {
   min-width: 0;
 }
 
-.spec-group__move {
-  display: inline-flex;
-  float: right;
-  gap: .25rem;
-  margin-left: .5rem;
-}
-
-.spec-move--row {
-  display: inline-flex;
-  flex-direction: column;
-  gap: .18rem;
-}
-
-.spec-move__btn {
+.spec-drag {
   align-items: center;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 7px;
   color: var(--text-muted);
-  cursor: pointer;
+  cursor: grab;
   display: inline-flex;
-  height: 1.5rem;
   justify-content: center;
-  padding: 0;
-  width: 1.7rem;
+  touch-action: none;
+  user-select: none;
 }
 
-.spec-move--row .spec-move__btn {
-  border-radius: 5px;
+.spec-drag:active {
+  cursor: grabbing;
+}
+
+.spec-drag svg {
+  fill: currentColor;
   height: 1.15rem;
+  width: 1.15rem;
+}
+
+.spec-row__drag {
+  height: 2rem;
   width: 1.6rem;
 }
 
-.spec-move__btn:hover,
-.spec-move__btn:focus {
-  background: var(--elevated);
-  color: var(--text);
+.spec-group__drag {
+  float: right;
+  height: 1.4rem;
+  margin-left: .5rem;
 }
 
-.spec-move__btn svg {
-  fill: none;
-  height: .85rem;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 2.3;
-  width: .85rem;
+.spec-row.is-dragging,
+.spec-group.is-dragging {
+  background: var(--elevated);
+  box-shadow: var(--shadow);
+  opacity: .92;
+}
+
+.spec-group.is-dragging {
+  border-radius: 12px;
 }
 
 .spec-row + .spec-row {

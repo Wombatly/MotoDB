@@ -82,13 +82,8 @@
       {% for category, specs in technical_groups %}
         <details class="spec-group" data-spec-category>
           <summary>
-            <span class="spec-group__move">
-              <button type="button" class="spec-move__btn" data-move-category="up" aria-label="Kategorie nach oben">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"></path></svg>
-              </button>
-              <button type="button" class="spec-move__btn" data-move-category="down" aria-label="Kategorie nach unten">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg>
-              </button>
+            <span class="spec-drag spec-group__drag" data-drag-handle="category" aria-label="Kategorie verschieben" title="Verschieben">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="6" r="1.5"></circle><circle cx="15" cy="6" r="1.5"></circle><circle cx="9" cy="12" r="1.5"></circle><circle cx="15" cy="12" r="1.5"></circle><circle cx="9" cy="18" r="1.5"></circle><circle cx="15" cy="18" r="1.5"></circle></svg>
             </span>
             {{ category or "Allgemein" }}
           </summary>
@@ -97,14 +92,9 @@
               <div class="spec-row" data-spec-row data-spec-id="{{ spec.id }}">
                 <input type="hidden" name="kategorie" value="{{ spec.kategorie or 'Allgemein' }}">
                 <input type="hidden" name="name" value="{{ spec.name }}">
-                <div class="spec-move spec-move--row">
-                  <button type="button" class="spec-move__btn" data-move-spec="up" aria-label="Eintrag nach oben">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"></path></svg>
-                  </button>
-                  <button type="button" class="spec-move__btn" data-move-spec="down" aria-label="Eintrag nach unten">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg>
-                  </button>
-                </div>
+                <span class="spec-drag spec-row__drag" data-drag-handle="spec" aria-label="Eintrag verschieben" title="Verschieben">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="6" r="1.5"></circle><circle cx="15" cy="6" r="1.5"></circle><circle cx="9" cy="12" r="1.5"></circle><circle cx="15" cy="12" r="1.5"></circle><circle cx="9" cy="18" r="1.5"></circle><circle cx="15" cy="18" r="1.5"></circle></svg>
+                </span>
                 <div class="spec-row__body">
                   <span>{{ spec.name }}</span>
                   <div class="spec-row__value">

@@ -205,36 +205,66 @@ function persistSheetOrder(form) {
   }).catch(() => {});
 }
 
-function moveSheetElement(element, selector, direction) {
-  let sibling = direction === "up" ? element.previousElementSibling : element.nextElementSibling;
-  while (sibling && !sibling.matches(selector)) {
-    sibling = direction === "up" ? sibling.previousElementSibling : sibling.nextElementSibling;
-  }
-  if (!sibling) return false;
-  if (direction === "up") element.parentNode.insertBefore(element, sibling);
-  else element.parentNode.insertBefore(sibling, element);
-  return true;
+function initSheetDrag(form) {
+  if (!form) return;
+  form.querySelectorAll("[data-drag-handle]").forEach((handle) => {
+    // Greifen am Handle darf nicht das Kategorie-Dropdown umschalten.
+    handle.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+    });
+
+    handle.addEventListener("pointerdown", (event) => {
+      const selector = handle.dataset.dragHandle === "category" ? "[data-spec-category]" : "[data-spec-row]";
+      const item = handle.closest(selector);
+      if (!item) return;
+      event.preventDefault();
+      const container = item.parentNode;
+      let moved = false;
+      item.classList.add("is-dragging");
+      handle.setPointerCapture(event.pointerId);
+
+      const onMove = (moveEvent) => {
+        moveEvent.preventDefault();
+        moved = true;
+        const y = moveEvent.clientY;
+        const edge = 60;
+        if (y < edge) window.scrollBy(0, -12);
+        else if (y > window.innerHeight - edge) window.scrollBy(0, 12);
+        const siblings = Array.from(container.children).filter((node) => node !== item && node.matches(selector));
+        let placed = false;
+        for (const sibling of siblings) {
+          const rect = sibling.getBoundingClientRect();
+          if (y < rect.top + rect.height / 2) {
+            container.insertBefore(item, sibling);
+            placed = true;
+            break;
+          }
+        }
+        if (!placed && siblings.length) container.appendChild(item);
+      };
+
+      const onUp = (upEvent) => {
+        item.classList.remove("is-dragging");
+        handle.removeEventListener("pointermove", onMove);
+        handle.removeEventListener("pointerup", onUp);
+        handle.removeEventListener("pointercancel", onUp);
+        try {
+          handle.releasePointerCapture(upEvent.pointerId);
+        } catch (error) {
+          /* capture bereits freigegeben */
+        }
+        if (moved) persistSheetOrder(form);
+      };
+
+      handle.addEventListener("pointermove", onMove);
+      handle.addEventListener("pointerup", onUp);
+      handle.addEventListener("pointercancel", onUp);
+    });
+  });
 }
 
-document.querySelectorAll("[data-move-spec]").forEach((button) => {
-  button.addEventListener("click", () => {
-    const row = button.closest("[data-spec-row]");
-    if (row && moveSheetElement(row, "[data-spec-row]", button.dataset.moveSpec)) {
-      persistSheetOrder(button.closest("[data-autosave-sheet]"));
-    }
-  });
-});
-
-document.querySelectorAll("[data-move-category]").forEach((button) => {
-  button.addEventListener("click", (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    const group = button.closest("[data-spec-category]");
-    if (group && moveSheetElement(group, "[data-spec-category]", button.dataset.moveCategory)) {
-      persistSheetOrder(button.closest("[data-autosave-sheet]"));
-    }
-  });
-});
+initSheetDrag(document.querySelector("[data-autosave-sheet][data-reorder-url]"));
 
 function normalizeNumberInput(input) {
   const raw = input.value.replace(/[^\d]/g, "");
