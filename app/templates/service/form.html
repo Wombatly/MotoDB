@@ -1,14 +1,9 @@
 {% extends "base.html" %}
+{% from "_macros.html" import page_header %}
 {% block title %}{{ title }}{% endblock %}
 
 {% block content %}
-<div class="d-flex align-items-center justify-content-between gap-3 mb-3">
-  <div>
-    <h1 class="h3 mb-1">{{ title }}</h1>
-    <p class="text-secondary mb-0">{{ motorcycle.marke }} {{ motorcycle.modell }}</p>
-  </div>
-  <a class="btn btn-outline-secondary" href="{{ url_for('main.motorcycle_detail', motorrad_id=motorcycle.id) }}">Zurück</a>
-</div>
+{{ page_header(title, motorcycle.marke ~ " " ~ motorcycle.modell, url_for('main.motorcycle_detail', motorrad_id=motorcycle.id)) }}
 
 <form method="post" enctype="multipart/form-data" class="form-panel" {% if not service.id %}data-offline-service-form{% endif %} data-motorrad-id="{{ motorcycle.id }}">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

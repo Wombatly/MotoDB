@@ -14,6 +14,14 @@ document.querySelector("[data-toast-close]")?.addEventListener("click", () => {
   document.getElementById("appToast")?.classList.remove("toast--visible");
 });
 
+const themeSelect = document.getElementById("themeSelect");
+if (themeSelect && window.__motodbTheme) {
+  themeSelect.value = window.__motodbTheme.get();
+  themeSelect.addEventListener("change", () => {
+    window.__motodbTheme.set(themeSelect.value);
+  });
+}
+
 document.querySelector("[data-menu-toggle]")?.addEventListener("click", (event) => {
   const button = event.currentTarget;
   const menu = document.querySelector("[data-menu]");
@@ -54,11 +62,25 @@ document.querySelector("[data-service-type]")?.addEventListener("change", (event
   });
 });
 
-document.querySelector("[data-toggle-sheet]")?.addEventListener("click", () => {
-  const sheet = document.querySelector("[data-sheet]");
-  if (!sheet) return;
-  sheet.toggleAttribute("hidden");
-});
+const detailTabs = Array.from(document.querySelectorAll("[data-tab]"));
+if (detailTabs.length) {
+  const panels = Array.from(document.querySelectorAll("[data-panel]"));
+  const activateTab = (name) => {
+    const match = detailTabs.find((tab) => tab.dataset.tab === name);
+    if (!match) return;
+    detailTabs.forEach((tab) => {
+      tab.setAttribute("aria-selected", tab === match ? "true" : "false");
+    });
+    panels.forEach((panel) => {
+      panel.hidden = panel.dataset.panel !== name;
+    });
+  };
+  detailTabs.forEach((tab) => {
+    tab.addEventListener("click", () => activateTab(tab.dataset.tab));
+  });
+  const hash = window.location.hash.replace("#tab-", "");
+  if (hash) activateTab(hash);
+}
 
 document.querySelector("[data-add-checklist-item]")?.addEventListener("click", () => {
   const builder = document.querySelector("[data-checklist-builder]");

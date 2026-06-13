@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% from "_macros.html" import page_header %}
+{% block title %}Dokument hinzufügen{% endblock %}
+
+{% set back_url = url_for('main.motorcycle_detail', motorrad_id=motorcycle.id) ~ '#tab-dokumente' %}
+
+{% block content %}
+{{ page_header("Dokument hinzufügen", motorcycle.marke ~ " " ~ motorcycle.modell, back_url) }}
+
+<form method="post" action="{{ url_for('main.documents') }}" enctype="multipart/form-data" class="form-panel">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="motorrad_id" value="{{ motorcycle.id }}">
+  <input type="hidden" name="next" value="{{ back_url }}">
+
+  <div class="row g-3">
+    <div class="col-12">
+      <label class="form-label" for="kategorie">Kategorie</label>
+      <select class="form-select" id="kategorie" name="kategorie">
+        {% for category in document_categories %}
+          <option value="{{ category }}">{{ category }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-12">
+      <label class="form-label" for="titel">Titel</label>
+      <input class="form-control" id="titel" name="titel" placeholder="z. B. ABE Auspuff">
+    </div>
+  </div>
+
+  <h2 class="h5 mt-4 mb-3">Datei</h2>
+  <label class="form-label" for="document">Bild oder PDF hochladen</label>
+  <input class="form-control mb-3" id="document" name="document" type="file" accept="image/*,application/pdf" required>
+
+  <div class="d-flex gap-2 mt-4">
+    <button class="btn btn-primary" type="submit">Speichern</button>
+  </div>
+</form>
+{% endblock %}

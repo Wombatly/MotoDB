@@ -1,18 +1,11 @@
 {% extends "base.html" %}
+{% from "_macros.html" import page_header %}
 {% block title %}{% if checklist %}Checkliste bearbeiten{% else %}Checkliste anlegen{% endif %}{% endblock %}
 
+{% set back_url = url_for('main.checklist_index', motorrad_id=motorcycle.id) if motorcycle else url_for('main.index') %}
+
 {% block content %}
-<div class="d-flex align-items-start justify-content-between gap-3 mb-3">
-  <div>
-    <h1 class="h3 mb-1">{% if checklist %}Checkliste bearbeiten{% else %}Checkliste anlegen{% endif %}</h1>
-    <p class="text-secondary mb-0">Vorlage mit Prüfpunkten und Kommentaren speichern.</p>
-  </div>
-  {% if motorcycle %}
-    <a class="btn btn-outline-secondary" href="{{ url_for('main.checklist_index', motorrad_id=motorcycle.id) }}">Zurück</a>
-  {% else %}
-    <a class="btn btn-outline-secondary" href="{{ url_for('main.index') }}">Zurück</a>
-  {% endif %}
-</div>
+{{ page_header("Checkliste bearbeiten" if checklist else "Checkliste anlegen", "Vorlage mit Prüfpunkten und Kommentaren speichern.", back_url) }}
 
 <form method="post" class="form-panel">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -111,12 +104,14 @@
       <textarea class="form-control" id="anmerkungen" name="anmerkungen" rows="3">{{ checklist.anmerkungen or '' if checklist else '' }}</textarea>
     </div>
   </div>
-  <div class="d-flex gap-2 mt-4">
+  <div class="form-actions mt-4">
     <button class="btn btn-primary" type="submit">{% if checklist %}Speichern{% else %}Anlegen{% endif %}</button>
-    {% if motorcycle %}
-      <a class="btn btn-outline-secondary" href="{{ url_for('main.checklist_index', motorrad_id=motorcycle.id) }}">Abbrechen</a>
-    {% else %}
-      <a class="btn btn-outline-secondary" href="{{ url_for('main.index') }}">Abbrechen</a>
+    {% if checklist %}
+      <form method="post" action="{{ url_for('main.checklist_delete', checklist_id=checklist.id) }}" data-confirm="Diese Vorlage wirklich löschen?">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="next" value="{{ back_url }}">
+        <button class="btn btn-outline-danger" type="submit">Löschen</button>
+      </form>
     {% endif %}
   </div>
 </form>

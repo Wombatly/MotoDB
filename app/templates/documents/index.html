@@ -1,22 +1,13 @@
 {% extends "base.html" %}
+{% from "_macros.html" import page_header, motorcycle_select %}
 {% block title %}Dokumente{% endblock %}
 
 {% block content %}
-<div class="d-flex align-items-start justify-content-between gap-3 mb-3">
-  <div>
-    <h1 class="h3 mb-1">Dokumente</h1>
-    <p class="text-secondary mb-0">Fahrzeugschein, ABEs, Gutachten und weitere Unterlagen.</p>
-  </div>
-</div>
+{{ page_header("Dokumente", "Fahrzeugschein, ABEs, Gutachten und weitere Unterlagen.") }}
 
 {% if motorcycles %}
   <form class="form-panel mb-3" method="get" action="{{ url_for('main.documents') }}">
-    <label class="form-label" for="motorrad_id">Motorrad</label>
-    <select class="form-select" id="motorrad_id" name="motorrad_id" data-document-motorcycle-select>
-      {% for option in motorcycles %}
-        <option value="{{ option.id }}" {% if motorcycle and option.id == motorcycle.id %}selected{% endif %}>{{ option.marke }} {{ option.modell }}</option>
-      {% endfor %}
-    </select>
+    {{ motorcycle_select(motorcycles, motorcycle, "data-document-motorcycle-select") }}
   </form>
 
   <form class="form-panel mb-4" method="post" enctype="multipart/form-data">

@@ -1,0 +1,23 @@
+{% macro page_header(title, subtitle=None, back_url=None) %}
+<div class="page-head">
+  <div>
+    <h1 class="h3 mb-1">{{ title }}</h1>
+    {% if subtitle %}<p class="text-secondary mb-0">{{ subtitle }}</p>{% endif %}
+  </div>
+  {% if back_url or caller is defined %}
+    <div class="page-head__actions">
+      {% if caller is defined %}{{ caller() }}{% endif %}
+      {% if back_url %}<a class="btn btn-outline-secondary" href="{{ back_url }}">Zurück</a>{% endif %}
+    </div>
+  {% endif %}
+</div>
+{% endmacro %}
+
+{% macro motorcycle_select(motorcycles, selected, hook, label="Motorrad", required=True) %}
+<label class="form-label" for="motorrad_id">{{ label }}</label>
+<select class="form-select" id="motorrad_id" name="motorrad_id" {{ hook }} {% if required %}required{% endif %}>
+  {% for option in motorcycles %}
+    <option value="{{ option.id }}" {% if selected and option.id == selected.id %}selected{% endif %}>{{ option.marke }} {{ option.modell }}</option>
+  {% endfor %}
+</select>
+{% endmacro %}

@@ -72,6 +72,13 @@ def current_user_motorcycles_query():
     return Motorcycle.query.filter_by(user_id=current_user.id)
 
 
+def safe_next_url(next_url):
+    """Return next_url only if it is a safe, app-internal relative path."""
+    if next_url and next_url.startswith("/") and not next_url.startswith("//"):
+        return next_url
+    return None
+
+
 def template_zip_response(zip_filename, files):
     zip_buffer = BytesIO()
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
@@ -290,10 +297,12 @@ def documents():
     motorcycles = current_user_motorcycles_query().order_by(Motorcycle.marke, Motorcycle.modell).all()
     if request.method == "POST":
         motorcycle = require_motorcycle_ownership(parse_int(request.form.get("motorrad_id")))
+        next_url = safe_next_url(request.form.get("next"))
+        success_redirect = redirect(next_url or url_for("main.documents", motorrad_id=motorcycle.id))
         document_file = request.files.get("document")
         if storage_quota_exceeded(current_user.id, [document_file]):
             flash("Speicherlimit von 500 MB erreicht. Bitte lösche zuerst Dateien.", "danger")
-            return redirect(url_for("main.documents", motorrad_id=motorcycle.id))
+            return success_redirect
         document_path, original_name = save_upload(document_file, motorcycle.id, "documents")
         if document_path:
             title = request.form.get("titel", "").strip() or original_name or "Dokument"
@@ -309,7 +318,7 @@ def documents():
                 )
             )
             db.session.commit()
-        return redirect(url_for("main.documents", motorrad_id=motorcycle.id))
+        return success_redirect
 
     selected_id = parse_int(request.args.get("motorrad_id"))
     motorcycle = (
@@ -343,7 +352,19 @@ def document_delete(document_id):
     delete_upload_file(document.path)
     db.session.delete(document)
     db.session.commit()
-    return redirect(url_for("main.documents", motorrad_id=motorrad_id))
+    next_url = safe_next_url(request.form.get("next"))
+    return redirect(next_url or url_for("main.documents", motorrad_id=motorrad_id))
+
+
+@bp.route("/motorrad/<int:motorrad_id>/dokumente/neu")
+@login_required
+def document_new(motorrad_id):
+    motorcycle = require_motorcycle_ownership(motorrad_id)
+    return render_template(
+        "documents/form.html",
+        motorcycle=motorcycle,
+        document_categories=DOCUMENT_CATEGORIES,
+    )
 
 
 @bp.route("/checklisten/neu", methods=["GET", "POST"])
@@ -495,6 +516,11 @@ def motorcycle_detail(motorrad_id):
         .order_by(TechnicalSpec.kategorie, TechnicalSpec.name)
         .all()
     )
+    documents = (
+        MotorcycleDocument.query.filter_by(motorrad_id=motorrad_id, user_id=current_user.id)
+        .order_by(MotorcycleDocument.created_at.desc(), MotorcycleDocument.id.desc())
+        .all()
+    )
     checklist_templates = (
         ServiceChecklist.query.filter_by(motorrad_id=motorrad_id, user_id=current_user.id, is_template=True)
         .order_by(ServiceChecklist.datum.desc().nullslast(), ServiceChecklist.id.desc())
@@ -541,6 +567,8 @@ def motorcycle_detail(motorrad_id):
         costs_by_category=costs_by_category,
         total_costs=total_costs,
         technical_specs=technical_specs,
+        documents=documents,
+        document_categories=DOCUMENT_CATEGORIES,
         checklist_templates=checklist_templates,
         checklist_records=checklist_records,
         history=history,
@@ -660,17 +688,10 @@ def checklist_index(motorrad_id):
         .order_by(ServiceChecklist.datum.desc().nullslast(), ServiceChecklist.id.desc())
         .all()
     )
-    checklist_records = (
-        ServiceChecklist.query.filter_by(motorrad_id=motorrad_id)
-        .filter_by(is_template=False)
-        .order_by(ServiceChecklist.completed_at.desc().nullslast(), ServiceChecklist.id.desc())
-        .all()
-    )
     return render_template(
         "checklists/index.html",
         motorcycle=motorcycle,
         checklist_templates=checklist_templates,
-        checklist_records=checklist_records,
     )
 
 
@@ -767,10 +788,8 @@ def checklist_delete(checklist_id):
     motorrad_id = checklist.motorrad_id
     db.session.delete(checklist)
     db.session.commit()
-    next_url = request.form.get("next", "")
-    if next_url.startswith("/") and not next_url.startswith("//"):
-        return redirect(next_url)
-    return redirect(url_for("main.checklist_index", motorrad_id=motorrad_id))
+    next_url = safe_next_url(request.form.get("next"))
+    return redirect(next_url or url_for("main.checklist_index", motorrad_id=motorrad_id))
 
 
 @bp.route("/motorrad/<int:motorrad_id>/service/neu", methods=["GET", "POST"])

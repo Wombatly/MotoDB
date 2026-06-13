@@ -1,13 +1,9 @@
 {% extends "base.html" %}
+{% from "_macros.html" import page_header %}
 {% block title %}Nutzerverwaltung{% endblock %}
 
 {% block content %}
-<div class="d-flex align-items-start justify-content-between gap-3 mb-3">
-  <div>
-    <h1 class="h3 mb-1">Admin</h1>
-    <p class="text-secondary mb-0">Nutzer, Rollen und Datenbestand verwalten.</p>
-  </div>
-</div>
+{{ page_header("Admin", "Nutzer, Rollen und Datenbestand verwalten.", url_for('main.settings')) }}
 
 {% if users %}
   <section class="overview-strip mb-3" aria-label="Admin Übersicht">

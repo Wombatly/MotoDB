@@ -1,76 +1,43 @@
 {% extends "base.html" %}
-{% block title %}Service-Checklisten{% endblock %}
+{% from "_macros.html" import page_header %}
+{% block title %}Checklisten-Vorlagen{% endblock %}
 
 {% block content %}
-<div class="d-flex align-items-start justify-content-between gap-3 mb-3">
-  <div>
-    <h1 class="h3 mb-1">Service-Checklisten</h1>
-    <p class="text-secondary mb-0">{{ motorcycle.marke }} {{ motorcycle.modell }}</p>
+{% call page_header("Checklisten-Vorlagen", motorcycle.marke ~ " " ~ motorcycle.modell, url_for('main.motorcycle_detail', motorrad_id=motorcycle.id)) %}
+  <a class="btn btn-primary" href="{{ url_for('main.checklist_new', motorrad_id=motorcycle.id) }}">+ Neu</a>
+  <a class="btn btn-outline-secondary" href="{{ url_for('main.checklist_import', motorrad_id=motorcycle.id) }}">Import</a>
+{% endcall %}
+
+{% if checklist_templates %}
+  <div class="history-list mb-3">
+    {% for checklist in checklist_templates %}
+      <a class="history-row" href="{{ url_for('main.checklist_template_edit', checklist_id=checklist.id) }}">
+        <div>
+          <div class="history-row__title">{{ checklist.titel }}</div>
+          <div class="history-row__badges">
+            <span class="chip">{{ checklist|checklist_interval }}</span>
+            <span class="chip">{{ checklist.items|length }} Prüfpunkte</span>
+          </div>
+        </div>
+        <span class="history-row__trailing">
+          <span class="history-row__chevron" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"></path></svg>
+          </span>
+        </span>
+      </a>
+    {% endfor %}
   </div>
-  <a class="btn btn-outline-secondary" href="{{ url_for('main.motorcycle_detail', motorrad_id=motorcycle.id) }}">Zurück</a>
-</div>
-
-<section class="mb-4">
-  <h2 class="h5 mb-3">Vorlagen</h2>
-  {% if checklist_templates %}
-    <div class="service-list">
-      {% for checklist in checklist_templates %}
-        <article class="service-entry">
-          <div class="d-flex justify-content-between gap-3">
-            <div>
-              <h3 class="h6 mb-1">{{ checklist.titel }}</h3>
-              <p class="text-secondary mb-2">
-                Vorlage
-                {% if checklist.intervall_km %} · {{ checklist.intervall_km|km }}{% endif %}
-                {% if checklist.intervall_monate %} · {{ checklist.intervall_monate|number }} Monate{% endif %}
-                · {{ checklist.items|length }} Prüfpunkte
-              </p>
-            </div>
-          </div>
-          <div class="d-flex gap-2 flex-wrap">
-            <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('main.checklist_template_edit', checklist_id=checklist.id) }}">Bearbeiten</a>
-            <form method="post" action="{{ url_for('main.checklist_delete', checklist_id=checklist.id) }}" data-confirm="Diese Checkliste wirklich löschen?">
-              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-              <button class="btn btn-sm btn-outline-danger" type="submit">Löschen</button>
-            </form>
-          </div>
-        </article>
-      {% endfor %}
+  <div class="empty-state">
+    <span>Ausgefüllte Checklisten findest du als Eintrag in der Service-Historie des Motorrads.</span>
+  </div>
+{% else %}
+  <div class="empty-state">
+    <strong>Noch keine Vorlagen gespeichert.</strong>
+    <span>Lege eine Vorlage an oder importiere eine Punkteliste – danach kannst du sie beim Service ausfüllen.</span>
+    <div class="action-row mt-3">
+      <a class="btn btn-primary" href="{{ url_for('main.checklist_new', motorrad_id=motorcycle.id) }}">Vorlage anlegen</a>
+      <a class="btn btn-outline-secondary" href="{{ url_for('main.checklist_import', motorrad_id=motorcycle.id) }}">Import</a>
     </div>
-  {% else %}
-    <p class="text-secondary">Noch keine Vorlagen gespeichert.</p>
-  {% endif %}
-</section>
-
-<section>
-  <h2 class="h5 mb-3">Abgeschlossene Datensätze</h2>
-  {% if checklist_records %}
-    <div class="service-list">
-      {% for checklist in checklist_records %}
-        <article class="service-entry">
-          <div class="d-flex justify-content-between gap-3">
-            <div>
-              <h3 class="h6 mb-1">{{ checklist.titel }}</h3>
-              <p class="text-secondary mb-2">
-                {{ checklist.datum|date_de }}
-                {% if checklist.kilometerstand %} · {{ checklist.kilometerstand|km }}{% endif %}
-                {% if checklist.intervall_km %} · {{ checklist.intervall_km|km }}{% endif %}
-              </p>
-            </div>
-            <strong>{{ checklist.items|selectattr("erledigt")|list|length }}/{{ checklist.items|length }}</strong>
-          </div>
-          <div class="d-flex gap-2 flex-wrap">
-            <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('main.checklist_edit', checklist_id=checklist.id) }}">Anzeigen</a>
-            <form method="post" action="{{ url_for('main.checklist_delete', checklist_id=checklist.id) }}" data-confirm="Diesen abgeschlossenen Datensatz wirklich löschen?">
-              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-              <button class="btn btn-sm btn-outline-danger" type="submit">Löschen</button>
-            </form>
-          </div>
-        </article>
-      {% endfor %}
-    </div>
-  {% else %}
-    <p class="text-secondary">Noch keine abgeschlossenen Datensätze vorhanden.</p>
-  {% endif %}
-</section>
+  </div>
+{% endif %}
 {% endblock %}

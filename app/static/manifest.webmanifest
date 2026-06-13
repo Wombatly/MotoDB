@@ -3,7 +3,7 @@
   "short_name": "MotoDB",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#f4f6f8",
-  "theme_color": "#1f2937",
+  "background_color": "#15171a",
+  "theme_color": "#15171a",
   "icons": []
 }
