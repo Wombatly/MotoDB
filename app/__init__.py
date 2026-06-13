@@ -223,6 +223,30 @@ def ensure_schema_updates():
                 "ALTER TABLE service_checklist_item ADD COLUMN kommentar_vorlage TEXT"
             )
 
+        spec_columns = {
+            row[1]
+            for row in connection.exec_driver_sql("PRAGMA table_info(technical_spec)")
+        }
+        if "position" not in spec_columns:
+            connection.exec_driver_sql(
+                "ALTER TABLE technical_spec ADD COLUMN position INTEGER NOT NULL DEFAULT 0"
+            )
+            connection.exec_driver_sql(
+                """
+                UPDATE technical_spec
+                SET position = (
+                    SELECT COUNT(*)
+                    FROM technical_spec AS earlier
+                    WHERE earlier.motorrad_id = technical_spec.motorrad_id
+                      AND (
+                          COALESCE(earlier.kategorie, '') < COALESCE(technical_spec.kategorie, '')
+                          OR (COALESCE(earlier.kategorie, '') = COALESCE(technical_spec.kategorie, '') AND earlier.name < technical_spec.name)
+                          OR (COALESCE(earlier.kategorie, '') = COALESCE(technical_spec.kategorie, '') AND earlier.name = technical_spec.name AND earlier.id < technical_spec.id)
+                      )
+                )
+                """
+            )
+
         connection.exec_driver_sql(
             """
             INSERT INTO motorcycle_image (motorcycle_id, path, original_name, position, created_at)

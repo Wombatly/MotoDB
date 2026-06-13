@@ -77,20 +77,40 @@
 
 <section id="panel-datenblatt" role="tabpanel" aria-labelledby="tab-datenblatt" data-panel="datenblatt" class="mb-4" hidden>
   {% if technical_specs %}
-    <form class="spec-groups" method="post" action="{{ url_for('main.motorcycle_data_sheet_update', motorrad_id=motorcycle.id) }}" data-autosave-sheet data-sheet>
+    <form class="spec-groups" method="post" action="{{ url_for('main.motorcycle_data_sheet_update', motorrad_id=motorcycle.id) }}" data-autosave-sheet data-sheet data-reorder-url="{{ url_for('main.motorcycle_data_sheet_reorder', motorrad_id=motorcycle.id) }}">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      {% for category, specs in technical_specs|groupby("kategorie") %}
-        <details class="spec-group">
-          <summary>{{ category or "Allgemein" }}</summary>
+      {% for category, specs in technical_groups %}
+        <details class="spec-group" data-spec-category>
+          <summary>
+            <span class="spec-group__move">
+              <button type="button" class="spec-move__btn" data-move-category="up" aria-label="Kategorie nach oben">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"></path></svg>
+              </button>
+              <button type="button" class="spec-move__btn" data-move-category="down" aria-label="Kategorie nach unten">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg>
+              </button>
+            </span>
+            {{ category or "Allgemein" }}
+          </summary>
           <div class="spec-list">
             {% for spec in specs %}
-              <div class="spec-row">
+              <div class="spec-row" data-spec-row data-spec-id="{{ spec.id }}">
                 <input type="hidden" name="kategorie" value="{{ spec.kategorie or 'Allgemein' }}">
                 <input type="hidden" name="name" value="{{ spec.name }}">
-                <span>{{ spec.name }}</span>
-                <div class="spec-row__value">
-                  <input class="spec-input spec-input--value" name="wert" value="{{ spec.wert or '' }}{% if spec.einheit %} {{ spec.einheit }}{% endif %}" aria-label="{{ spec.name }} Wert">
-                  <input type="hidden" name="einheit" value="">
+                <div class="spec-move spec-move--row">
+                  <button type="button" class="spec-move__btn" data-move-spec="up" aria-label="Eintrag nach oben">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"></path></svg>
+                  </button>
+                  <button type="button" class="spec-move__btn" data-move-spec="down" aria-label="Eintrag nach unten">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg>
+                  </button>
+                </div>
+                <div class="spec-row__body">
+                  <span>{{ spec.name }}</span>
+                  <div class="spec-row__value">
+                    <input class="spec-input spec-input--value" name="wert" value="{{ spec.wert or '' }}{% if spec.einheit %} {{ spec.einheit }}{% endif %}" aria-label="{{ spec.name }} Wert">
+                    <input type="hidden" name="einheit" value="">
+                  </div>
                 </div>
                 <input type="hidden" name="quelle" value="">
               </div>

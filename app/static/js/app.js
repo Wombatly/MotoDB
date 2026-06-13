@@ -194,6 +194,48 @@ document.querySelectorAll("[data-autosave-sheet] .spec-input").forEach((input) =
   });
 });
 
+function persistSheetOrder(form) {
+  if (!form || !form.dataset.reorderUrl) return;
+  const ids = Array.from(form.querySelectorAll("[data-spec-id]")).map((row) => row.dataset.specId);
+  const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute("content");
+  fetch(form.dataset.reorderUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-CSRFToken": token || "" },
+    body: JSON.stringify({ order: ids }),
+  }).catch(() => {});
+}
+
+function moveSheetElement(element, selector, direction) {
+  let sibling = direction === "up" ? element.previousElementSibling : element.nextElementSibling;
+  while (sibling && !sibling.matches(selector)) {
+    sibling = direction === "up" ? sibling.previousElementSibling : sibling.nextElementSibling;
+  }
+  if (!sibling) return false;
+  if (direction === "up") element.parentNode.insertBefore(element, sibling);
+  else element.parentNode.insertBefore(sibling, element);
+  return true;
+}
+
+document.querySelectorAll("[data-move-spec]").forEach((button) => {
+  button.addEventListener("click", () => {
+    const row = button.closest("[data-spec-row]");
+    if (row && moveSheetElement(row, "[data-spec-row]", button.dataset.moveSpec)) {
+      persistSheetOrder(button.closest("[data-autosave-sheet]"));
+    }
+  });
+});
+
+document.querySelectorAll("[data-move-category]").forEach((button) => {
+  button.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const group = button.closest("[data-spec-category]");
+    if (group && moveSheetElement(group, "[data-spec-category]", button.dataset.moveCategory)) {
+      persistSheetOrder(button.closest("[data-autosave-sheet]"));
+    }
+  });
+});
+
 function normalizeNumberInput(input) {
   const raw = input.value.replace(/[^\d]/g, "");
   if (!raw) {

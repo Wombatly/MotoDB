@@ -1214,9 +1214,65 @@ a {
 .spec-row {
   align-items: center;
   display: grid;
-  gap: .45rem;
+  gap: .6rem;
+  grid-template-columns: auto minmax(0, 1fr);
+  padding: .6rem .85rem;
+}
+
+.spec-row__body {
+  display: grid;
+  gap: .35rem;
   grid-template-columns: 1fr;
-  padding: .75rem .85rem;
+  min-width: 0;
+}
+
+.spec-group__move {
+  display: inline-flex;
+  float: right;
+  gap: .25rem;
+  margin-left: .5rem;
+}
+
+.spec-move--row {
+  display: inline-flex;
+  flex-direction: column;
+  gap: .18rem;
+}
+
+.spec-move__btn {
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: inline-flex;
+  height: 1.5rem;
+  justify-content: center;
+  padding: 0;
+  width: 1.7rem;
+}
+
+.spec-move--row .spec-move__btn {
+  border-radius: 5px;
+  height: 1.15rem;
+  width: 1.6rem;
+}
+
+.spec-move__btn:hover,
+.spec-move__btn:focus {
+  background: var(--elevated);
+  color: var(--text);
+}
+
+.spec-move__btn svg {
+  fill: none;
+  height: .85rem;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.3;
+  width: .85rem;
 }
 
 .spec-row + .spec-row {
@@ -1871,9 +1927,9 @@ a {
     grid-template-columns: 1fr auto;
   }
 
-  .spec-row {
+  .spec-row__body {
     align-items: end;
-    grid-template-columns: minmax(12rem, 1fr) minmax(10rem, 1.2fr);
+    grid-template-columns: minmax(10rem, 1fr) minmax(9rem, 1.1fr);
   }
 
   .user-row {

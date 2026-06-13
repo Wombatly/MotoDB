@@ -497,9 +497,17 @@ def motorcycle_detail(motorrad_id):
     total_costs = sum(entry.kosten or 0 for entry in services)
     technical_specs = (
         TechnicalSpec.query.filter_by(motorrad_id=motorrad_id, user_id=current_user.id)
-        .order_by(TechnicalSpec.kategorie, TechnicalSpec.name)
+        .order_by(TechnicalSpec.position, TechnicalSpec.id)
         .all()
     )
+    technical_groups = []
+    group_index = {}
+    for spec in technical_specs:
+        category = spec.kategorie or "Allgemein"
+        if category not in group_index:
+            group_index[category] = len(technical_groups)
+            technical_groups.append((category, []))
+        technical_groups[group_index[category]][1].append(spec)
     documents = (
         MotorcycleDocument.query.filter_by(motorrad_id=motorrad_id, user_id=current_user.id)
         .order_by(MotorcycleDocument.created_at.desc(), MotorcycleDocument.id.desc())
@@ -544,6 +552,7 @@ def motorcycle_detail(motorrad_id):
         services=services,
         total_costs=total_costs,
         technical_specs=technical_specs,
+        technical_groups=technical_groups,
         documents=documents,
         history=history,
     )
@@ -650,6 +659,25 @@ def motorcycle_data_sheet_update(motorrad_id):
     motorcycle = require_motorcycle_ownership(motorrad_id)
     save_technical_specs(motorcycle)
     return redirect(url_for("main.motorcycle_detail", motorrad_id=motorcycle.id))
+
+
+@bp.route("/motorrad/<int:motorrad_id>/datenblatt/reihenfolge", methods=["POST"])
+@login_required
+def motorcycle_data_sheet_reorder(motorrad_id):
+    require_motorcycle_ownership(motorrad_id)
+    payload = request.get_json(silent=True) or {}
+    specs = {
+        spec.id: spec
+        for spec in TechnicalSpec.query.filter_by(motorrad_id=motorrad_id, user_id=current_user.id).all()
+    }
+    position = 0
+    for raw_id in payload.get("order", []):
+        spec = specs.get(parse_int(raw_id))
+        if spec is not None:
+            spec.position = position
+            position += 1
+    db.session.commit()
+    return ("", 204)
 
 
 @bp.route("/motorrad/<int:motorrad_id>/checklisten")
@@ -1468,8 +1496,8 @@ def save_technical_specs(motorcycle):
         return
 
     TechnicalSpec.query.filter_by(motorrad_id=motorcycle.id).delete()
-    for row in merged_rows:
-        db.session.add(TechnicalSpec(motorrad_id=motorcycle.id, user_id=motorcycle.user_id, **row))
+    for index, row in enumerate(merged_rows):
+        db.session.add(TechnicalSpec(motorrad_id=motorcycle.id, user_id=motorcycle.user_id, position=index, **row))
     db.session.commit()
 
 
