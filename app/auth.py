@@ -12,6 +12,7 @@ from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.utils import secure_filename
 
 from app import db
+from app.export_pdf import build_motorcycle_pdf
 from app.models import User, Motorcycle, MotorcycleDocument, MotorcycleImage, ServiceEntry, TechnicalSpec, ServiceChecklist
 
 auth_bp = Blueprint('auth', __name__)
@@ -443,6 +444,17 @@ def user_export():
                 (folder_path / 'daten.json').as_posix(),
                 json.dumps(motorcycle_data, indent=2, ensure_ascii=False),
             )
+
+            title_rel = motorcycle.bild or (gallery_images[0].path if gallery_images else None)
+            title_image_path = None
+            if title_rel:
+                candidate = upload_root / title_rel
+                if candidate.exists() and candidate.is_file():
+                    title_image_path = str(candidate)
+            pdf_bytes = build_motorcycle_pdf(
+                motorcycle, services, specs, checklists, documents, title_image_path
+            )
+            zf.writestr((folder_path / 'zusammenfassung.pdf').as_posix(), pdf_bytes)
 
     zip_buffer.seek(0)
     return send_file(

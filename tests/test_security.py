@@ -691,9 +691,15 @@ class SecurityTestCase(unittest.TestCase):
             with zipfile.ZipFile(BytesIO(response.data)) as archive:
                 names = set(archive.namelist())
                 self.assertIn("profil.json", names)
+                self.assertIn("Honda_Transalp/zusammenfassung.pdf", names)
                 self.assertIn("Honda_Transalp/daten.json", names)
                 self.assertIn("Honda_Transalp/bilder/titel.jpg", names)
                 self.assertIn("Honda_Transalp/belege/rechnung.pdf", names)
+
+                # Lesbares PDF liegt neben der maschinenlesbaren JSON
+                summary_pdf = archive.read("Honda_Transalp/zusammenfassung.pdf")
+                self.assertTrue(summary_pdf.startswith(b"%PDF-"))
+                self.assertGreater(len(summary_pdf), 1000)
 
                 export_json = json.loads(archive.read("Honda_Transalp/daten.json"))
                 self.assertEqual(export_json["motorrad"]["modell"], "Transalp")
