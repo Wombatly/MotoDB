@@ -38,16 +38,10 @@ document.addEventListener("click", (event) => {
   toggle.setAttribute("aria-expanded", "false");
 });
 
-document.querySelector("[data-technical-motorcycle-select]")?.addEventListener("change", (event) => {
-  window.location.href = `/technik?motorrad_id=${event.target.value}`;
-});
-
-document.querySelector("[data-checklist-import-motorcycle-select]")?.addEventListener("change", (event) => {
-  window.location.href = `/checklisten/import?motorrad_id=${event.target.value}`;
-});
-
-document.querySelector("[data-document-motorcycle-select]")?.addEventListener("change", (event) => {
-  window.location.href = `/dokumente?motorrad_id=${event.target.value}`;
+document.querySelectorAll("[data-nav-select]").forEach((select) => {
+  select.addEventListener("change", () => {
+    window.location.href = `${select.dataset.navSelect}?motorrad_id=${select.value}`;
+  });
 });
 
 document.querySelector("[data-service-type]")?.addEventListener("change", (event) => {

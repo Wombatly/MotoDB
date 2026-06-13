@@ -79,6 +79,13 @@ def safe_next_url(next_url):
     return None
 
 
+def resolve_motorcycle(motorcycles, selected_id):
+    """Return the owned motorcycle for selected_id, else the first one, else None."""
+    if selected_id:
+        return current_user_motorcycles_query().filter_by(id=selected_id).first()
+    return motorcycles[0] if motorcycles else None
+
+
 def template_zip_response(zip_filename, files):
     zip_buffer = BytesIO()
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
@@ -320,12 +327,7 @@ def documents():
             db.session.commit()
         return success_redirect
 
-    selected_id = parse_int(request.args.get("motorrad_id"))
-    motorcycle = (
-        current_user_motorcycles_query().filter_by(id=selected_id).first()
-        if selected_id
-        else (motorcycles[0] if motorcycles else None)
-    )
+    motorcycle = resolve_motorcycle(motorcycles, parse_int(request.args.get("motorrad_id")))
     documents = []
     if motorcycle:
         documents = (
@@ -378,12 +380,7 @@ def checklist_new_global():
         db.session.commit()
         return redirect(url_for("main.checklist_index", motorrad_id=checklist.motorrad_id))
 
-    selected_id = parse_int(request.args.get("motorrad_id"))
-    selected_motorcycle = (
-        current_user_motorcycles_query().filter_by(id=selected_id).first()
-        if selected_id
-        else (motorcycles[0] if motorcycles else None)
-    )
+    selected_motorcycle = resolve_motorcycle(motorcycles, parse_int(request.args.get("motorrad_id")))
     preset_key = request.args.get("preset", "")
     preset = SERVICE_CHECKLIST_PRESETS.get(preset_key, {})
     return render_template(
@@ -412,12 +409,7 @@ def checklist_import_global():
         db.session.commit()
         return redirect(url_for("main.checklist_index", motorrad_id=checklist.motorrad_id))
 
-    selected_id = parse_int(request.args.get("motorrad_id"))
-    selected_motorcycle = (
-        current_user_motorcycles_query().filter_by(id=selected_id).first()
-        if selected_id
-        else (motorcycles[0] if motorcycles else None)
-    )
+    selected_motorcycle = resolve_motorcycle(motorcycles, parse_int(request.args.get("motorrad_id")))
     return render_template(
         "checklists/import.html",
         motorcycle=selected_motorcycle,
@@ -441,12 +433,7 @@ def checklist_csv_template():
 @login_required
 def technical_data_global():
     motorcycles = current_user_motorcycles_query().order_by(Motorcycle.marke, Motorcycle.modell).all()
-    selected_id = parse_int(request.values.get("motorrad_id"))
-    motorcycle = (
-        current_user_motorcycles_query().filter_by(id=selected_id).first()
-        if selected_id
-        else (motorcycles[0] if motorcycles else None)
-    )
+    motorcycle = resolve_motorcycle(motorcycles, parse_int(request.values.get("motorrad_id")))
 
     if request.method == "POST":
         motorrad_id = parse_int(request.form.get("motorrad_id"))
@@ -507,10 +494,7 @@ def motorcycle_detail(motorrad_id):
         .order_by(ServiceEntry.datum.desc(), ServiceEntry.id.desc())
         .all()
     )
-    costs_by_category = {}
-    for entry in services:
-        costs_by_category[entry.kategorie] = costs_by_category.get(entry.kategorie, 0) + (entry.kosten or 0)
-    total_costs = sum(costs_by_category.values())
+    total_costs = sum(entry.kosten or 0 for entry in services)
     technical_specs = (
         TechnicalSpec.query.filter_by(motorrad_id=motorrad_id, user_id=current_user.id)
         .order_by(TechnicalSpec.kategorie, TechnicalSpec.name)
@@ -519,12 +503,6 @@ def motorcycle_detail(motorrad_id):
     documents = (
         MotorcycleDocument.query.filter_by(motorrad_id=motorrad_id, user_id=current_user.id)
         .order_by(MotorcycleDocument.created_at.desc(), MotorcycleDocument.id.desc())
-        .all()
-    )
-    checklist_templates = (
-        ServiceChecklist.query.filter_by(motorrad_id=motorrad_id, user_id=current_user.id, is_template=True)
-        .order_by(ServiceChecklist.datum.desc().nullslast(), ServiceChecklist.id.desc())
-        .limit(5)
         .all()
     )
     checklist_records = (
@@ -564,13 +542,9 @@ def motorcycle_detail(motorrad_id):
         gallery_images=gallery_images,
         primary_image=primary_image,
         services=services,
-        costs_by_category=costs_by_category,
         total_costs=total_costs,
         technical_specs=technical_specs,
         documents=documents,
-        document_categories=DOCUMENT_CATEGORIES,
-        checklist_templates=checklist_templates,
-        checklist_records=checklist_records,
         history=history,
     )
 
