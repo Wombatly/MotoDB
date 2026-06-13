@@ -2,92 +2,117 @@
 {% block title %}Profil · Einstellungen{% endblock %}
 
 {% block content %}
-<div class="d-flex align-items-start justify-content-between gap-3 mb-3">
+<div class="page-head">
   <div>
     <h1 class="h3 mb-1">Profil</h1>
+    <p class="text-secondary mb-0">{{ current_user.email }}</p>
   </div>
 </div>
 
-<section class="form-panel mt-3">
-  <h2 class="h5 mb-3">Konto</h2>
-  <p class="text-secondary">{{ current_user.email }}</p>
-  <div class="settings-actions">
-    <a class="btn btn-outline-secondary btn-icon" href="{{ url_for('auth.change_password') }}" aria-label="Passwort ändern" title="Passwort ändern">
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M7 10V7a5 5 0 0 1 10 0v3"></path>
-        <rect x="5" y="10" width="14" height="10" rx="2"></rect>
-        <path d="M12 14v2"></path>
-      </svg>
-    </a>
-    <a class="btn btn-outline-danger btn-icon" href="{{ url_for('auth.user_delete') }}" aria-label="Profil löschen" title="Profil löschen">
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M3 6h18"></path>
-        <path d="M8 6V4h8v2"></path>
-        <path d="M19 6l-1 14H6L5 6"></path>
-        <path d="M10 11v5"></path>
-        <path d="M14 11v5"></path>
-      </svg>
-    </a>
-    {% if current_user.is_admin %}
-      <a class="btn btn-outline-secondary" href="{{ url_for('auth.admin_users') }}">Nutzerverwaltung</a>
-    {% endif %}
-    <form method="post" action="{{ url_for('auth.logout') }}">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <button class="btn btn-outline-secondary" type="submit">Abmelden</button>
-    </form>
+<p class="settings-label">Darstellung</p>
+<div class="settings-list">
+  <div class="settings-control">
+    <label class="settings-control__label" for="themeSelect">Farbschema</label>
+    <select class="form-select" id="themeSelect" aria-label="Farbschema">
+      <option value="light">Hell</option>
+      <option value="dark">Nachtschicht</option>
+      <option value="system">System</option>
+    </select>
   </div>
-  <p class="mb-0 mt-3">
-    <a href="{{ url_for('main.privacy') }}">Datenschutzhinweise</a>
-  </p>
-</section>
+</div>
 
-<section class="form-panel mt-3">
-  <h2 class="h5 mb-3">Datensicherung</h2>
-  <p class="text-secondary mb-3">
-    Lade deine kompletten Daten – Motorräder, Serviceeinträge, technische Daten,
-    Checklisten, Bilder, Belege und Dokumente – als ZIP-Datei direkt auf dein
-    eigenes Gerät herunter. So hast du jederzeit ein lokales Backup, das nur dir
-    gehört und unabhängig vom Server ist.
-  </p>
-  <a class="btn btn-primary" href="{{ url_for('auth.user_export') }}">
-    Daten auf mein Gerät sichern
+<p class="settings-label">Konto</p>
+<div class="settings-list">
+  <a class="settings-row" href="{{ url_for('auth.change_password') }}">
+    <span class="settings-row__icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24"><path d="M7 10V7a5 5 0 0 1 10 0v3"></path><rect x="5" y="10" width="14" height="10" rx="2"></rect><path d="M12 14v2"></path></svg>
+    </span>
+    <span class="settings-row__text">Passwort ändern</span>
   </a>
-</section>
-
-<section class="form-panel mt-3">
-  <h2 class="h5 mb-3">Speicherbelegung</h2>
-  <p class="text-secondary mb-2">
-    {{ storage_used|filesize }} von {{ storage_limit|filesize }} belegt ({{ storage_percent }} %)
-  </p>
-  <progress class="storage-meter" max="100" value="{{ storage_percent }}" aria-label="{{ storage_percent }} Prozent belegt"></progress>
-</section>
-
-{% if current_user.is_admin %}
-  <form class="form-panel mt-3" method="post" action="{{ url_for('main.backup_path_update') }}">
+  {% if current_user.is_admin %}
+    <a class="settings-row" href="{{ url_for('auth.admin_users') }}">
+      <span class="settings-row__icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"></path><path d="M3 20a6 6 0 0 1 12 0"></path><path d="M16 5.5a3 3 0 0 1 0 5.5"></path><path d="M21 20a6 6 0 0 0-4-5.6"></path></svg>
+      </span>
+      <span class="settings-row__text">Nutzerverwaltung</span>
+    </a>
+  {% endif %}
+  <form method="post" action="{{ url_for('auth.logout') }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <h2 class="h5 mb-3">Sicherungsort</h2>
-    <input class="form-control" id="backup_path" name="backup_path" value="{{ backup_path }}" placeholder="/PFAD/ZUM/SICHERUNGSORDNER" aria-label="Sicherungsort">
-
-    <div class="d-flex gap-2 mt-4">
-      <button class="btn btn-primary" type="submit">Speichern</button>
-    </div>
+    <button class="settings-row" type="submit">
+      <span class="settings-row__icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><path d="M16 17l5-5-5-5"></path><path d="M21 12H9"></path></svg>
+      </span>
+      <span class="settings-row__text">Abmelden</span>
+    </button>
   </form>
-{% endif %}
+</div>
 
-<section class="form-panel mt-3">
-  <h2 class="h5 mb-3">Vorlagen</h2>
-  <div class="d-flex gap-2">
-    <a class="btn btn-outline-secondary" href="{{ url_for('main.checklist_csv_template') }}">Checklisten</a>
-    <a class="btn btn-outline-secondary" href="{{ url_for('main.technical_csv_template') }}">Datenblatt</a>
+<p class="settings-label">Daten und Backup</p>
+<div class="settings-list">
+  <div class="settings-meter">
+    <div class="settings-meter__head">
+      <span class="settings-row__text">Speicher</span>
+      <span>{{ storage_used|filesize }} / {{ storage_limit|filesize }} ({{ storage_percent }} %)</span>
+    </div>
+    <progress class="storage-meter" max="100" value="{{ storage_percent }}" aria-label="{{ storage_percent }} Prozent belegt"></progress>
   </div>
-</section>
+  <a class="settings-row" href="{{ url_for('auth.user_export') }}">
+    <span class="settings-row__icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24"><path d="M12 3v12"></path><path d="M8 11l4 4 4-4"></path><path d="M5 21h14"></path></svg>
+    </span>
+    <span class="settings-row__text">Backup herunterladen<span class="settings-row__hint">Alle Daten als ZIP auf dein Gerät</span></span>
+  </a>
+  {% if current_user.is_admin %}
+    <form class="settings-row settings-row--static" method="post" action="{{ url_for('main.backup_path_update') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <span class="settings-row__icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="M4 7a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"></path></svg>
+      </span>
+      <span class="settings-row__text">
+        <label class="form-label mb-1" for="backup_path">Sicherungsort</label>
+        <input class="form-control" id="backup_path" name="backup_path" value="{{ backup_path }}" placeholder="/PFAD/ZUM/SICHERUNGSORDNER" aria-label="Sicherungsort">
+      </span>
+      <button class="btn btn-primary btn-sm" type="submit">Speichern</button>
+    </form>
+  {% endif %}
+</div>
 
-<section class="form-panel mt-3">
-  <h2 class="h5 mb-3">Upload</h2>
-  <p class="text-secondary mb-3">Punktelisten importieren oder technische Daten einlesen/bearbeiten.</p>
-  <div class="d-flex gap-2">
-    <a class="btn btn-outline-secondary" href="{{ url_for('main.checklist_import_global') }}">Checklisten</a>
-    <a class="btn btn-outline-secondary" href="{{ url_for('main.technical_data_global') }}">Datenblatt</a>
+<p class="settings-label">Vorlagen und Import</p>
+<div class="settings-list">
+  <div class="settings-row settings-row--static">
+    <span class="settings-row__icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24"><path d="M9 11.5 11 13.5 15.5 9"></path><rect x="5" y="4" width="14" height="17" rx="2"></rect><path d="M9 4.5V3h6v1.5"></path></svg>
+    </span>
+    <span class="settings-row__text">Checklisten</span>
+    <span class="settings-row__links">
+      <a href="{{ url_for('main.checklist_csv_template') }}">CSV-Vorlage</a>
+      <a href="{{ url_for('main.checklist_import_global') }}">Import</a>
+    </span>
   </div>
-</section>
+  <div class="settings-row settings-row--static">
+    <span class="settings-row__icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"></rect><path d="M4 10h16"></path><path d="M10 4v16"></path></svg>
+    </span>
+    <span class="settings-row__text">Datenblatt</span>
+    <span class="settings-row__links">
+      <a href="{{ url_for('main.technical_csv_template') }}">CSV-Vorlage</a>
+      <a href="{{ url_for('main.technical_data_global') }}">Import</a>
+    </span>
+  </div>
+</div>
+
+<p class="settings-label">Gefahrenzone</p>
+<div class="settings-list settings-list--danger">
+  <a class="settings-row settings-row--danger" href="{{ url_for('auth.user_delete') }}">
+    <span class="settings-row__icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M19 6l-1 14H6L5 6"></path><path d="M10 11v5"></path><path d="M14 11v5"></path></svg>
+    </span>
+    <span class="settings-row__text">Profil löschen<span class="settings-row__hint">Konto und alle Daten unwiderruflich entfernen</span></span>
+  </a>
+</div>
+
+<p class="mt-4">
+  <a href="{{ url_for('main.privacy') }}">Datenschutzhinweise</a>
+</p>
 {% endblock %}

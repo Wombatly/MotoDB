@@ -12,7 +12,12 @@
   <div class="detail-hero__copy">
     <p class="eyebrow mb-1">{{ motorcycle.marke }}</p>
     <h1 class="h3 mb-1">{{ motorcycle.modell }}</h1>
-    <p class="text-secondary mb-0">{{ motorcycle.baujahr or "Baujahr offen" }} · {{ motorcycle.kilometerstand|km }}</p>
+    <p class="text-secondary mb-0">{{ motorcycle.baujahr or "Baujahr offen" }}</p>
+    <div class="hero-chips">
+      <span class="chip">{{ motorcycle.kilometerstand|km }}</span>
+      <span class="chip">{{ services|length }} Services</span>
+      <span class="chip">{{ total_costs|currency }}</span>
+    </div>
   </div>
   <div class="detail-hero__media">
     {% if primary_image %}
@@ -27,34 +32,52 @@
 </section>
 
 <div class="action-row mb-4">
-  <a class="btn btn-primary" href="{{ url_for('main.service_new', motorrad_id=motorcycle.id) }}">Service</a>
-  <a class="btn btn-outline-secondary" href="{{ url_for('main.checklist_index', motorrad_id=motorcycle.id) }}">Aufgabe</a>
-  <button class="btn btn-outline-secondary" type="button" data-toggle-sheet>Datenblatt</button>
+  <a class="btn btn-primary w-100" href="{{ url_for('main.service_new', motorrad_id=motorcycle.id) }}">+ Service eintragen</a>
 </div>
 
-<section class="overview-strip mb-4" aria-label="Motorrad Kennzahlen">
-  <div>
-    <span>Services</span>
-    <strong>{{ services|length }}</strong>
-  </div>
-  <div>
-    <span>Kosten</span>
-    <strong>{{ total_costs|currency }}</strong>
-  </div>
-  <div>
-    <span>Daten</span>
-    <strong>{{ technical_specs|length }}</strong>
-  </div>
+<div class="detail-tabs" role="tablist" aria-label="Motorrad-Bereiche">
+  <button class="detail-tab" type="button" role="tab" id="tab-historie" data-tab="historie" aria-controls="panel-historie" aria-selected="true">Historie</button>
+  <button class="detail-tab" type="button" role="tab" id="tab-datenblatt" data-tab="datenblatt" aria-controls="panel-datenblatt" aria-selected="false">Datenblatt</button>
+  <button class="detail-tab" type="button" role="tab" id="tab-dokumente" data-tab="dokumente" aria-controls="panel-dokumente" aria-selected="false">Dokumente</button>
+</div>
+
+<section id="panel-historie" role="tabpanel" aria-labelledby="tab-historie" data-panel="historie" class="mb-4">
+  {% if history %}
+    <div class="history-list">
+      {% for item in history %}
+        {% if item.kind == "checklist" %}
+          <a class="history-row" href="{{ url_for('main.checklist_edit', checklist_id=item.id) }}">
+        {% else %}
+          <a class="history-row" href="{{ url_for('main.service_detail', service_id=item.id) }}">
+        {% endif %}
+          <div>
+            <div class="history-row__title">{{ item.titel }}</div>
+            <p class="text-secondary mb-0">
+              {{ item.date|date_de }}
+              {% if item.kilometerstand %} · {{ item.kilometerstand|km }}{% endif %}
+              {% if item.intervall_km %} · {{ item.intervall_km|km }}{% endif %}
+            </p>
+          </div>
+          <span class="history-row__trailing">
+            {% if item.kosten %}<span class="history-row__amount">{{ item.kosten|currency }}</span>{% endif %}
+            <span class="history-row__chevron" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"></path></svg>
+            </span>
+          </span>
+        </a>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty-state">
+      <strong>Noch nichts eingetragen.</strong>
+      <span>Trage über „+ Service eintragen“ den ersten Service oder eine Checkliste ein.</span>
+    </div>
+  {% endif %}
 </section>
 
-<section class="mb-4" data-sheet hidden>
-  <div class="section-heading">
-    <div>
-      <h2 class="h5 mb-0">Datenblatt</h2>
-    </div>
-  </div>
+<section id="panel-datenblatt" role="tabpanel" aria-labelledby="tab-datenblatt" data-panel="datenblatt" class="mb-4" hidden>
   {% if technical_specs %}
-    <form class="spec-groups" method="post" action="{{ url_for('main.motorcycle_data_sheet_update', motorrad_id=motorcycle.id) }}" data-autosave-sheet>
+    <form class="spec-groups" method="post" action="{{ url_for('main.motorcycle_data_sheet_update', motorrad_id=motorcycle.id) }}" data-autosave-sheet data-sheet>
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       {% for category, specs in technical_specs|groupby("kategorie") %}
         <details class="spec-group">
@@ -76,54 +99,50 @@
         </details>
       {% endfor %}
     </form>
+    <div class="action-row mt-3">
+      <a class="btn btn-outline-secondary" href="{{ url_for('main.technical_data', motorrad_id=motorcycle.id) }}">CSV einlesen</a>
+    </div>
   {% else %}
     <div class="empty-state">
       <strong>Noch keine technischen Daten.</strong>
-      <span>Lege die Daten über das Menü unter „Technische Daten“ an oder lies eine CSV-Datei ein.</span>
+      <span>Lies die Werte als CSV ein – die Vorlage findest du im Profil unter „Vorlagen und Import“.</span>
+      <div class="action-row mt-3">
+        <a class="btn btn-outline-secondary" href="{{ url_for('main.technical_data', motorrad_id=motorcycle.id) }}">CSV einlesen</a>
+      </div>
     </div>
   {% endif %}
 </section>
 
-<section class="mb-4">
-  <h2 class="h5 mb-3">Service-Historie</h2>
-  {% if history %}
+<section id="panel-dokumente" role="tabpanel" aria-labelledby="tab-dokumente" data-panel="dokumente" class="mb-4" hidden>
+  <div class="action-row mb-3">
+    <a class="btn btn-outline-secondary" href="{{ url_for('main.document_new', motorrad_id=motorcycle.id) }}">Dokument hinzufügen</a>
+  </div>
+
+  {% if documents %}
     <div class="service-list">
-      {% for item in history %}
-        <article class="service-entry">
-          <div class="d-flex justify-content-between gap-3">
-            <div>
-              <h3 class="h6 mb-1">{{ item.titel }}</h3>
-              <p class="text-secondary mb-2">
-                {{ item.date|date_de }}
-                {% if item.kilometerstand %} · {{ item.kilometerstand|km }}{% endif %}
-                {% if item.intervall_km %} · {{ item.intervall_km|km }}{% endif %}
-              </p>
-            </div>
-            {% if item.kosten %}
-              <strong>{{ item.kosten|currency }}</strong>
-            {% endif %}
+      {% for document in documents %}
+        <article class="service-entry document-entry">
+          <div>
+            <h3 class="h6 mb-1">{{ document.titel }}</h3>
+            <p class="text-secondary mb-0">
+              {{ document.kategorie }}
+              {% if document.original_name %} · {{ document.original_name }}{% endif %}
+              · {{ document.created_at|date_de }}
+            </p>
           </div>
           <div class="d-flex gap-2 flex-wrap">
-            {% if item.kind == "checklist" %}
-              <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('main.checklist_edit', checklist_id=item.id) }}">Öffnen</a>
-              <form method="post" action="{{ url_for('main.checklist_delete', checklist_id=item.id) }}" data-confirm="Diesen Eintrag wirklich löschen?">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <input type="hidden" name="next" value="{{ url_for('main.motorcycle_detail', motorrad_id=motorcycle.id) }}">
-                <button class="btn btn-sm btn-outline-danger" type="submit">Löschen</button>
-              </form>
-            {% else %}
-              <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('main.service_detail', service_id=item.id) }}">Öffnen</a>
-              <form method="post" action="{{ url_for('main.service_delete', service_id=item.id) }}" data-confirm="Diesen Eintrag wirklich löschen?">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <button class="btn btn-sm btn-outline-danger" type="submit">Löschen</button>
-              </form>
-            {% endif %}
+            <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('main.uploaded_file', filename=document.path) }}">Öffnen</a>
+            <form method="post" action="{{ url_for('main.document_delete', document_id=document.id) }}" data-confirm="Dieses Dokument wirklich löschen?">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="next" value="{{ url_for('main.motorcycle_detail', motorrad_id=motorcycle.id) }}#tab-dokumente">
+              <button class="btn btn-sm btn-outline-danger" type="submit">Löschen</button>
+            </form>
           </div>
         </article>
       {% endfor %}
     </div>
   {% else %}
-    <p class="text-secondary">Noch nichts eingetragen.</p>
+    <p class="text-secondary">Noch keine Dokumente für dieses Motorrad gespeichert.</p>
   {% endif %}
 </section>
 

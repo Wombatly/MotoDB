@@ -1,10 +1,9 @@
 {% extends "base.html" %}
+{% from "_macros.html" import page_header %}
 {% block title %}{{ title }}{% endblock %}
 
 {% block content %}
-<div class="d-flex align-items-center justify-content-between gap-3 mb-3">
-  <h1 class="h3 mb-0">{{ title }}</h1>
-</div>
+{{ page_header(title) }}
 
 {% if gallery_images %}
   <section class="form-panel mb-3">

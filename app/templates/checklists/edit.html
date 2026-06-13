@@ -1,17 +1,11 @@
 {% extends "base.html" %}
+{% from "_macros.html" import page_header %}
 {% block title %}{% if checklist.is_template %}Checkliste ausfüllen{% else %}Checklisten-Datensatz{% endif %}{% endblock %}
 
+{% set subtitle = motorcycle.marke ~ " " ~ motorcycle.modell ~ (" · unveränderlich gespeichert" if not checklist.is_template else "") %}
+
 {% block content %}
-<div class="d-flex align-items-start justify-content-between gap-3 mb-3">
-  <div>
-    <h1 class="h3 mb-1">{% if checklist.is_template %}Checkliste ausfüllen{% else %}Checklisten-Datensatz{% endif %}</h1>
-    <p class="text-secondary mb-0">
-      {{ motorcycle.marke }} {{ motorcycle.modell }}
-      {% if not checklist.is_template %} · unveränderlich gespeichert{% endif %}
-    </p>
-  </div>
-  <a class="btn btn-outline-secondary" href="{{ url_for('main.motorcycle_detail', motorrad_id=motorcycle.id) }}">Zurück</a>
-</div>
+{{ page_header("Checkliste ausfüllen" if checklist.is_template else "Checklisten-Datensatz", subtitle, url_for('main.motorcycle_detail', motorrad_id=motorcycle.id)) }}
 
 <form method="post" class="form-panel">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -52,11 +46,17 @@
   <label class="form-label mt-4" for="anmerkungen">{% if checklist.is_template %}Gesamtanmerkung zum Datensatz{% else %}Gesamtanmerkung{% endif %}</label>
   <textarea class="form-control" id="anmerkungen" name="anmerkungen" rows="4" {% if not checklist.is_template %}disabled{% endif %}>{{ "" if checklist.is_template else checklist.anmerkungen or "" }}</textarea>
 
-  <div class="d-flex gap-2 mt-4">
+  <div class="form-actions mt-4">
     {% if checklist.is_template %}
       <button class="btn btn-primary" type="submit">Als Datensatz speichern</button>
+      <a class="btn btn-outline-secondary" href="{{ url_for('main.motorcycle_detail', motorrad_id=motorcycle.id) }}">Abbrechen</a>
+    {% else %}
+      <form method="post" action="{{ url_for('main.checklist_delete', checklist_id=checklist.id) }}" data-confirm="Diesen Datensatz wirklich löschen?">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="next" value="{{ url_for('main.motorcycle_detail', motorrad_id=motorcycle.id) }}">
+        <button class="btn btn-outline-danger" type="submit">Löschen</button>
+      </form>
     {% endif %}
-    <a class="btn btn-outline-secondary" href="{{ url_for('main.motorcycle_detail', motorrad_id=motorcycle.id) }}">Abbrechen</a>
   </div>
 </form>
 {% endblock %}
