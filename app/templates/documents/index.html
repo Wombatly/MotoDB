@@ -7,7 +7,7 @@
 
 {% if motorcycles %}
   <form class="form-panel mb-3" method="get" action="{{ url_for('main.documents') }}">
-    {{ motorcycle_select(motorcycles, motorcycle, "data-document-motorcycle-select") }}
+    {{ motorcycle_select(motorcycles, motorcycle, url_for('main.documents')) }}
   </form>
 
   <form class="form-panel mb-4" method="post" enctype="multipart/form-data">

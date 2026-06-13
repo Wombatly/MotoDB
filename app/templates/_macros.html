@@ -13,9 +13,9 @@
 </div>
 {% endmacro %}
 
-{% macro motorcycle_select(motorcycles, selected, hook, label="Motorrad", required=True) %}
+{% macro motorcycle_select(motorcycles, selected, nav_url=None, label="Motorrad", required=True) %}
 <label class="form-label" for="motorrad_id">{{ label }}</label>
-<select class="form-select" id="motorrad_id" name="motorrad_id" {{ hook }} {% if required %}required{% endif %}>
+<select class="form-select" id="motorrad_id" name="motorrad_id"{% if nav_url %} data-nav-select="{{ nav_url }}"{% endif %}{% if required %} required{% endif %}>
   {% for option in motorcycles %}
     <option value="{{ option.id }}" {% if selected and option.id == selected.id %}selected{% endif %}>{{ option.marke }} {{ option.modell }}</option>
   {% endfor %}
