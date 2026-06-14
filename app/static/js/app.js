@@ -222,10 +222,11 @@ function initSheetDrag(form) {
       const container = item.parentNode;
       let moved = false;
       item.classList.add("is-dragging");
-      handle.setPointerCapture(event.pointerId);
 
+      // Auf document hoeren (nicht auf dem Handle), damit das Verschieben des
+      // Elements im DOM die Move-Events nicht abreissen laesst.
       const onMove = (moveEvent) => {
-        moveEvent.preventDefault();
+        if (moveEvent.cancelable) moveEvent.preventDefault();
         moved = true;
         const y = moveEvent.clientY;
         const edge = 60;
@@ -244,22 +245,17 @@ function initSheetDrag(form) {
         if (!placed && siblings.length) container.appendChild(item);
       };
 
-      const onUp = (upEvent) => {
+      const onUp = () => {
         item.classList.remove("is-dragging");
-        handle.removeEventListener("pointermove", onMove);
-        handle.removeEventListener("pointerup", onUp);
-        handle.removeEventListener("pointercancel", onUp);
-        try {
-          handle.releasePointerCapture(upEvent.pointerId);
-        } catch (error) {
-          /* capture bereits freigegeben */
-        }
+        document.removeEventListener("pointermove", onMove);
+        document.removeEventListener("pointerup", onUp);
+        document.removeEventListener("pointercancel", onUp);
         if (moved) persistSheetOrder(form);
       };
 
-      handle.addEventListener("pointermove", onMove);
-      handle.addEventListener("pointerup", onUp);
-      handle.addEventListener("pointercancel", onUp);
+      document.addEventListener("pointermove", onMove, { passive: false });
+      document.addEventListener("pointerup", onUp);
+      document.addEventListener("pointercancel", onUp);
     });
   });
 }
