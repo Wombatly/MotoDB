@@ -1214,9 +1214,59 @@ a {
 .spec-row {
   align-items: center;
   display: grid;
-  gap: .45rem;
+  gap: .6rem;
+  grid-template-columns: auto minmax(0, 1fr);
+  padding: .6rem .85rem;
+}
+
+.spec-row__body {
+  display: grid;
+  gap: .35rem;
   grid-template-columns: 1fr;
-  padding: .75rem .85rem;
+  min-width: 0;
+}
+
+.spec-drag {
+  align-items: center;
+  color: var(--text-muted);
+  cursor: grab;
+  display: inline-flex;
+  justify-content: center;
+  touch-action: none;
+  user-select: none;
+}
+
+.spec-drag:active {
+  cursor: grabbing;
+}
+
+.spec-drag svg {
+  fill: currentColor;
+  height: 1.15rem;
+  pointer-events: none;
+  width: 1.15rem;
+}
+
+.spec-row__drag {
+  height: 2rem;
+  width: 1.6rem;
+}
+
+.spec-group__drag {
+  float: right;
+  height: 1.4rem;
+  margin-left: .5rem;
+}
+
+.spec-row.is-dragging,
+.spec-group.is-dragging {
+  background: var(--elevated);
+  box-shadow: var(--shadow);
+  opacity: .92;
+}
+
+.spec-group.is-dragging {
+  border-radius: 12px;
 }
 
 .spec-row + .spec-row {
@@ -1871,9 +1921,9 @@ a {
     grid-template-columns: 1fr auto;
   }
 
-  .spec-row {
+  .spec-row__body {
     align-items: end;
-    grid-template-columns: minmax(12rem, 1fr) minmax(10rem, 1.2fr);
+    grid-template-columns: minmax(10rem, 1fr) minmax(9rem, 1.1fr);
   }
 
   .user-row {

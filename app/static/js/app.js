@@ -194,6 +194,74 @@ document.querySelectorAll("[data-autosave-sheet] .spec-input").forEach((input) =
   });
 });
 
+function persistSheetOrder(form) {
+  if (!form || !form.dataset.reorderUrl) return;
+  const ids = Array.from(form.querySelectorAll("[data-spec-id]")).map((row) => row.dataset.specId);
+  const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute("content");
+  fetch(form.dataset.reorderUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-CSRFToken": token || "" },
+    body: JSON.stringify({ order: ids }),
+  }).catch(() => {});
+}
+
+function initSheetDrag(form) {
+  if (!form) return;
+  form.querySelectorAll("[data-drag-handle]").forEach((handle) => {
+    // Greifen am Handle darf nicht das Kategorie-Dropdown umschalten.
+    handle.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+    });
+
+    handle.addEventListener("pointerdown", (event) => {
+      const selector = handle.dataset.dragHandle === "category" ? "[data-spec-category]" : "[data-spec-row]";
+      const item = handle.closest(selector);
+      if (!item) return;
+      event.preventDefault();
+      const container = item.parentNode;
+      let moved = false;
+      item.classList.add("is-dragging");
+
+      // Auf document hoeren (nicht auf dem Handle), damit das Verschieben des
+      // Elements im DOM die Move-Events nicht abreissen laesst.
+      const onMove = (moveEvent) => {
+        if (moveEvent.cancelable) moveEvent.preventDefault();
+        moved = true;
+        const y = moveEvent.clientY;
+        const edge = 60;
+        if (y < edge) window.scrollBy(0, -12);
+        else if (y > window.innerHeight - edge) window.scrollBy(0, 12);
+        const siblings = Array.from(container.children).filter((node) => node !== item && node.matches(selector));
+        let placed = false;
+        for (const sibling of siblings) {
+          const rect = sibling.getBoundingClientRect();
+          if (y < rect.top + rect.height / 2) {
+            container.insertBefore(item, sibling);
+            placed = true;
+            break;
+          }
+        }
+        if (!placed && siblings.length) container.appendChild(item);
+      };
+
+      const onUp = () => {
+        item.classList.remove("is-dragging");
+        document.removeEventListener("pointermove", onMove);
+        document.removeEventListener("pointerup", onUp);
+        document.removeEventListener("pointercancel", onUp);
+        if (moved) persistSheetOrder(form);
+      };
+
+      document.addEventListener("pointermove", onMove, { passive: false });
+      document.addEventListener("pointerup", onUp);
+      document.addEventListener("pointercancel", onUp);
+    });
+  });
+}
+
+initSheetDrag(document.querySelector("[data-autosave-sheet][data-reorder-url]"));
+
 function normalizeNumberInput(input) {
   const raw = input.value.replace(/[^\d]/g, "");
   if (!raw) {

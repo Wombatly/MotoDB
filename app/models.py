@@ -141,6 +141,7 @@ class TechnicalSpec(db.Model):
     einheit = db.Column(db.String(40))
     kategorie = db.Column(db.String(80), default="Allgemein")
     quelle = db.Column(db.String(240))
+    position = db.Column(db.Integer, nullable=False, default=0)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(
         db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
