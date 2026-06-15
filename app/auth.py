@@ -2,6 +2,7 @@ import json
 import shutil
 import zipfile
 from datetime import datetime
+from app.timeutils import utcnow
 from functools import wraps
 from io import BytesIO
 from pathlib import Path
@@ -184,7 +185,7 @@ def login():
 
         clear_auth_attempts(rate_limit_keys)
         login_user(user)
-        user.last_login = datetime.utcnow()
+        user.last_login = utcnow()
         db.session.commit()
 
         return redirect(url_for('main.index'))
@@ -535,7 +536,7 @@ def toggle_admin(user_id):
         flash('Du kannst deine eigenen Admin-Rechte nicht ändern.', 'danger')
         return redirect(url_for('auth.admin_users'))
 
-    user = User.query.get_or_404(user_id)
+    user = db.get_or_404(User, user_id)
     user.is_admin = not user.is_admin
     db.session.commit()
 
@@ -552,7 +553,7 @@ def admin_delete_user(user_id):
         flash('Du kannst dein eigenes Admin-Konto nicht löschen.', 'danger')
         return redirect(url_for('auth.admin_users'))
 
-    user = User.query.get_or_404(user_id)
+    user = db.get_or_404(User, user_id)
     if user.is_admin and User.query.filter_by(is_admin=True).count() <= 1:
         flash('Der letzte Admin kann nicht gelöscht werden.', 'danger')
         return redirect(url_for('auth.admin_users'))

@@ -1,4 +1,5 @@
 from datetime import datetime
+from app.timeutils import utcnow
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -11,7 +12,7 @@ class User(UserMixin, db.Model):
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
     is_admin = db.Column(db.Boolean, default=False, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(db.DateTime, default=utcnow, nullable=False)
     last_login = db.Column(db.DateTime)
     consent_accepted_at = db.Column(db.DateTime)
 
@@ -36,7 +37,7 @@ class AuditLog(db.Model):
     table_name = db.Column(db.String(80), nullable=False)
     record_id = db.Column(db.Integer)
     changes_json = db.Column(db.Text)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(db.DateTime, default=utcnow, nullable=False)
 
 
 class Motorcycle(db.Model):
@@ -59,9 +60,9 @@ class Motorcycle(db.Model):
     aktiv = db.Column(db.Boolean, default=True, nullable=False)
     notizen = db.Column(db.Text)
     bild = db.Column(db.String(255))
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(db.DateTime, default=utcnow, nullable=False)
     updated_at = db.Column(
-        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+        db.DateTime, default=utcnow, onupdate=utcnow, nullable=False
     )
 
     services = db.relationship(
@@ -95,7 +96,7 @@ class MotorcycleImage(db.Model):
     path = db.Column(db.String(255), nullable=False)
     original_name = db.Column(db.String(255))
     position = db.Column(db.Integer, default=0, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(db.DateTime, default=utcnow, nullable=False)
 
 
 class MotorcycleDocument(db.Model):
@@ -106,9 +107,9 @@ class MotorcycleDocument(db.Model):
     kategorie = db.Column(db.String(80), nullable=False)
     path = db.Column(db.String(255), nullable=False)
     original_name = db.Column(db.String(255))
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(db.DateTime, default=utcnow, nullable=False)
     updated_at = db.Column(
-        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+        db.DateTime, default=utcnow, onupdate=utcnow, nullable=False
     )
 
 
@@ -126,9 +127,9 @@ class ServiceEntry(db.Model):
     beleg_originalname = db.Column(db.String(255))
     naechster_service_km = db.Column(db.Integer)
     naechster_service_datum = db.Column(db.Date)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(db.DateTime, default=utcnow, nullable=False)
     updated_at = db.Column(
-        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+        db.DateTime, default=utcnow, onupdate=utcnow, nullable=False
     )
 
 
@@ -142,9 +143,9 @@ class TechnicalSpec(db.Model):
     kategorie = db.Column(db.String(80), default="Allgemein")
     quelle = db.Column(db.String(240))
     position = db.Column(db.Integer, nullable=False, default=0)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(db.DateTime, default=utcnow, nullable=False)
     updated_at = db.Column(
-        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+        db.DateTime, default=utcnow, onupdate=utcnow, nullable=False
     )
 
 
@@ -161,9 +162,9 @@ class ServiceChecklist(db.Model):
     is_template = db.Column(db.Boolean, default=True, nullable=False)
     source_template_id = db.Column(db.Integer, db.ForeignKey("service_checklist.id"))
     completed_at = db.Column(db.DateTime)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(db.DateTime, default=utcnow, nullable=False)
     updated_at = db.Column(
-        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+        db.DateTime, default=utcnow, onupdate=utcnow, nullable=False
     )
 
     items = db.relationship(
@@ -184,7 +185,7 @@ class ServiceChecklistItem(db.Model):
     erledigt = db.Column(db.Boolean, default=False, nullable=False)
     anmerkung = db.Column(db.Text)
     updated_at = db.Column(
-        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+        db.DateTime, default=utcnow, onupdate=utcnow, nullable=False
     )
 
 
@@ -192,5 +193,5 @@ class AppSetting(db.Model):
     key = db.Column(db.String(80), primary_key=True)
     value = db.Column(db.String(500))
     updated_at = db.Column(
-        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+        db.DateTime, default=utcnow, onupdate=utcnow, nullable=False
     )

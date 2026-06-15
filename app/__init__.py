@@ -1,4 +1,5 @@
 from datetime import datetime
+from app.timeutils import utcnow
 import os
 from pathlib import Path
 
@@ -82,7 +83,7 @@ def create_app():
     @login_manager.user_loader
     def load_user(user_id):
         from app.models import User
-        return User.query.get(int(user_id))
+        return db.session.get(User, int(user_id))
 
     @app.after_request
     def add_security_headers(response):
@@ -312,7 +313,7 @@ def ensure_admin(public_hosting=False):
         ).first()
         if existing_user:
             existing_user.is_admin = True
-            existing_user.consent_accepted_at = existing_user.consent_accepted_at or datetime.utcnow()
+            existing_user.consent_accepted_at = existing_user.consent_accepted_at or utcnow()
             existing_user.set_password(admin_password)
             db.session.commit()
             return
@@ -321,7 +322,7 @@ def ensure_admin(public_hosting=False):
             username=admin_username,
             email=admin_email,
             is_admin=True,
-            consent_accepted_at=datetime.utcnow(),
+            consent_accepted_at=utcnow(),
         )
         admin.set_password(admin_password)
         db.session.add(admin)
@@ -343,7 +344,7 @@ def ensure_admin(public_hosting=False):
     ).first()
     if existing_user:
         existing_user.is_admin = True
-        existing_user.consent_accepted_at = existing_user.consent_accepted_at or datetime.utcnow()
+        existing_user.consent_accepted_at = existing_user.consent_accepted_at or utcnow()
         db.session.commit()
         return
 
@@ -351,7 +352,7 @@ def ensure_admin(public_hosting=False):
         username="admin",
         email=DEFAULT_ADMIN_EMAIL,
         is_admin=True,
-        consent_accepted_at=datetime.utcnow(),
+        consent_accepted_at=utcnow(),
     )
     admin.set_password(DEFAULT_ADMIN_PASSWORD)
     db.session.add(admin)
@@ -365,7 +366,7 @@ def ensure_admin(public_hosting=False):
 def ensure_default_settings():
     from app.models import AppSetting
 
-    if not AppSetting.query.get("backup_path"):
+    if not db.session.get(AppSetting, "backup_path"):
         db.session.add(
             AppSetting(
                 key="backup_path",
