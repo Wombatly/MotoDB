@@ -1,4 +1,5 @@
 from datetime import datetime
+from app.timeutils import utcnow
 import csv
 import io
 import json
@@ -516,7 +517,7 @@ def save_upload(file_storage, motorcycle_id, folder):
         return None, None
 
     stored_extension = ".jpg" if extension in IMAGE_EXTENSIONS else extension
-    filename = f"{datetime.utcnow().strftime('%Y%m%d%H%M%S')}_{uuid4().hex[:8]}{stored_extension}"
+    filename = f"{utcnow().strftime('%Y%m%d%H%M%S')}_{uuid4().hex[:8]}{stored_extension}"
     relative_path = Path(str(motorcycle_id)) / folder / filename
     target = current_app.config["UPLOAD_FOLDER"] / relative_path
     target.parent.mkdir(parents=True, exist_ok=True)

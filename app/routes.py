@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from app.timeutils import utcnow
 from io import BytesIO
 from pathlib import Path
 import os
@@ -62,7 +63,7 @@ MAX_USER_STORAGE_BYTES = _max_storage_mb() * 1024 * 1024  # Limit pro Account
 
 def require_motorcycle_ownership(motorcycle_id):
     """Verify current user owns the motorcycle."""
-    motorcycle = Motorcycle.query.get_or_404(motorcycle_id)
+    motorcycle = db.get_or_404(Motorcycle, motorcycle_id)
     if motorcycle.user_id != current_user.id:
         abort(403)
     return motorcycle
@@ -267,7 +268,7 @@ def index():
 @login_required
 @admin_required
 def backup_path_update():
-    setting = AppSetting.query.get("backup_path")
+    setting = db.session.get(AppSetting, "backup_path")
     if not setting:
         setting = AppSetting(key="backup_path")
         db.session.add(setting)
@@ -347,7 +348,7 @@ def documents():
 @bp.route("/dokumente/<int:document_id>/loeschen", methods=["POST"])
 @login_required
 def document_delete(document_id):
-    document = MotorcycleDocument.query.get_or_404(document_id)
+    document = db.get_or_404(MotorcycleDocument, document_id)
     if document.user_id != current_user.id:
         abort(403)
     motorrad_id = document.motorrad_id
@@ -745,7 +746,7 @@ def checklist_import(motorrad_id):
 @bp.route("/checklisten/<int:checklist_id>", methods=["GET", "POST"])
 @login_required
 def checklist_edit(checklist_id):
-    checklist = ServiceChecklist.query.get_or_404(checklist_id)
+    checklist = db.get_or_404(ServiceChecklist, checklist_id)
     require_motorcycle_ownership(checklist.motorrad_id)
     if request.method == "POST":
         if not checklist.is_template:
@@ -760,7 +761,7 @@ def checklist_edit(checklist_id):
 @bp.route("/checklisten/<int:checklist_id>/vorlage-bearbeiten", methods=["GET", "POST"])
 @login_required
 def checklist_template_edit(checklist_id):
-    checklist = ServiceChecklist.query.get_or_404(checklist_id)
+    checklist = db.get_or_404(ServiceChecklist, checklist_id)
     require_motorcycle_ownership(checklist.motorrad_id)
     if not checklist.is_template:
         abort(409)
@@ -785,7 +786,7 @@ def checklist_template_edit(checklist_id):
 @bp.route("/checklisten/<int:checklist_id>/loeschen", methods=["POST"])
 @login_required
 def checklist_delete(checklist_id):
-    checklist = ServiceChecklist.query.get_or_404(checklist_id)
+    checklist = db.get_or_404(ServiceChecklist, checklist_id)
     require_motorcycle_ownership(checklist.motorrad_id)
     motorrad_id = checklist.motorrad_id
     db.session.delete(checklist)
@@ -813,7 +814,7 @@ def service_new(motorrad_id):
         service_art = request.form.get("service_art", "free")
         if service_art.startswith("checklist:"):
             template_id = parse_int(service_art.split(":")[1])
-            template = ServiceChecklist.query.get(template_id) if template_id else None
+            template = db.session.get(ServiceChecklist, template_id) if template_id else None
             if template and template.motorrad_id == motorrad_id and template.user_id == current_user.id:
                 record = ServiceChecklist(
                     motorrad_id=motorrad_id,
@@ -826,7 +827,7 @@ def service_new(motorrad_id):
                     anmerkungen=request.form.get("beschreibung"),
                     is_template=False,
                     source_template_id=template.id,
-                    completed_at=datetime.utcnow(),
+                    completed_at=utcnow(),
                 )
                 db.session.add(record)
                 db.session.flush()
@@ -873,7 +874,7 @@ def service_new(motorrad_id):
 @bp.route("/service/<int:service_id>/bearbeiten", methods=["GET", "POST"])
 @login_required
 def service_edit(service_id):
-    service = ServiceEntry.query.get_or_404(service_id)
+    service = db.get_or_404(ServiceEntry, service_id)
     if service.user_id != current_user.id:
         abort(403)
     motorcycle = service.motorcycle
@@ -904,7 +905,7 @@ def service_edit(service_id):
 @bp.route("/service/<int:service_id>/ansicht")
 @login_required
 def service_detail(service_id):
-    service = ServiceEntry.query.get_or_404(service_id)
+    service = db.get_or_404(ServiceEntry, service_id)
     if service.user_id != current_user.id:
         abort(403)
     return render_template("service/detail.html", service=service, motorcycle=service.motorcycle)
@@ -913,7 +914,7 @@ def service_detail(service_id):
 @bp.route("/service/<int:service_id>/loeschen", methods=["POST"])
 @login_required
 def service_delete(service_id):
-    service = ServiceEntry.query.get_or_404(service_id)
+    service = db.get_or_404(ServiceEntry, service_id)
     if service.user_id != current_user.id:
         abort(403)
     motorrad_id = service.motorrad_id
@@ -977,7 +978,7 @@ def api_services(motorrad_id):
     if not current_user.is_authenticated:
         return jsonify([])
 
-    motorcycle = Motorcycle.query.get_or_404(motorrad_id)
+    motorcycle = db.get_or_404(Motorcycle, motorrad_id)
     if motorcycle.user_id != current_user.id:
         abort(403)
 
@@ -991,7 +992,7 @@ def api_create_service():
         abort(401)
 
     data = request.get_json(force=True)
-    motorcycle = Motorcycle.query.get_or_404(data.get("motorrad_id"))
+    motorcycle = db.get_or_404(Motorcycle, data.get("motorrad_id"))
     if motorcycle.user_id != current_user.id:
         abort(403)
 
@@ -1023,7 +1024,7 @@ def api_sync():
     create_sync_backup()
     created = []
     for item in data.get("services", []):
-        motorcycle = Motorcycle.query.get(item.get("motorrad_id"))
+        motorcycle = db.session.get(Motorcycle, item.get("motorrad_id"))
         if not motorcycle or motorcycle.user_id != current_user.id:
             continue
         service = ServiceEntry(
@@ -1044,8 +1045,8 @@ def api_sync():
         created.append(serialize_service(service))
     checklist_services = []
     for item in data.get("checklist_services", []):
-        template = ServiceChecklist.query.get(item.get("checklist_id"))
-        motorcycle = Motorcycle.query.get(item.get("motorrad_id"))
+        template = db.session.get(ServiceChecklist, item.get("checklist_id"))
+        motorcycle = db.session.get(Motorcycle, item.get("motorrad_id"))
         if not template or not motorcycle or template.motorrad_id != motorcycle.id:
             continue
         if motorcycle.user_id != current_user.id:
@@ -1276,7 +1277,7 @@ def group_checklists_by_interval(checklists):
 def find_motorcycle_for_checklist_row(row):
     motorrad_id = parse_int(row.get("motorrad_id"))
     if motorrad_id:
-        motorcycle = Motorcycle.query.get(motorrad_id)
+        motorcycle = db.session.get(Motorcycle, motorrad_id)
         if motorcycle and current_user.is_authenticated:
             return motorcycle if motorcycle.user_id == current_user.id else None
         return motorcycle
@@ -1428,7 +1429,7 @@ def create_checklist_record_from_template(template):
         anmerkungen=request.form.get("anmerkungen"),
         is_template=False,
         source_template_id=template.id,
-        completed_at=datetime.utcnow(),
+        completed_at=utcnow(),
     )
     db.session.add(record)
     db.session.flush()
@@ -1528,7 +1529,7 @@ def create_checklist_record_from_payload(template, data):
         anmerkungen=data.get("checklist_anmerkungen") or data.get("beschreibung"),
         is_template=False,
         source_template_id=template.id,
-        completed_at=datetime.utcnow(),
+        completed_at=utcnow(),
     )
     db.session.add(record)
     db.session.flush()
@@ -1564,7 +1565,7 @@ def serialize_service(service):
 
 
 def get_backup_path():
-    setting = AppSetting.query.get("backup_path")
+    setting = db.session.get(AppSetting, "backup_path")
     return setting.value if setting and setting.value else "/PFAD/ZUM/SICHERUNGSORDNER"
 
 
@@ -1591,7 +1592,7 @@ def create_sync_backup():
         return None
 
     backup_root = Path(backup_path).expanduser()
-    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    timestamp = utcnow().strftime("%Y%m%d_%H%M%S")
     target = backup_root / f"motorrad_service_sync_{timestamp}"
     target.mkdir(parents=True, exist_ok=True)
 
