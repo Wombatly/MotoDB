@@ -1,10 +1,10 @@
 # MotoDB
 
-MotoDB ist eine kleine Flask-Webanwendung zur Verwaltung von Motorrädern,
-Serviceeinträgen, technischen Daten, Checklisten und Belegen. Das Projekt ist
-auf den privaten Werkstatt- und Fuhrparkbetrieb ausgelegt: Motorräder können
-erfasst, Wartungen dokumentiert, Checklisten gepflegt und Serviceeinträge auch
-offline vorbereitet werden.
+MotoDB ist eine Flask-Webanwendung zur Verwaltung von Motorrädern,
+Serviceeinträgen, technischen Daten, Checklisten, Dokumenten und Belegen. Das
+Projekt ist auf den privaten Werkstatt- und Fuhrparkbetrieb ausgelegt:
+Motorräder können erfasst, Wartungen dokumentiert, Checklisten gepflegt und
+Serviceeinträge auch offline vorbereitet werden.
 
 Die Anwendung läuft lokal standardmäßig auf Port `5001` und kann für den
 Betrieb auf einem Raspberry Pi per Docker und Nginx bereitgestellt werden.
@@ -20,6 +20,7 @@ Betrieb auf einem Raspberry Pi per Docker und Nginx bereitgestellt werden.
 - [Benutzeroberfläche](#benutzeroberfläche)
 - [Checklisten](#checklisten)
 - [Technische Daten](#technische-daten)
+- [Dokumente](#dokumente)
 - [Offline-Sync](#offline-sync)
 - [API-Endpunkte](#api-endpunkte)
 - [Uploads und Belege](#uploads-und-belege)
@@ -34,7 +35,8 @@ Betrieb auf einem Raspberry Pi per Docker und Nginx bereitgestellt werden.
 - Motorräder mit Marke, Modell, Baujahr, Kilometerstand, Kaufdaten,
   Zulassung, Kennzeichen, VIN, Farbe, Hubraum, Leistung und Notizen anlegen.
 - Motorräder bearbeiten und löschen.
-- Motorradbilder hochladen und entfernen.
+- Motorradbilder hochladen und entfernen; mehrere Bilder pro Motorrad mit
+  Titelbild-Auswahl und Galerie-Ansicht.
 - Aktive und verkaufte Motorräder verwalten.
 - Automatische Aktualisierung des Kilometerstands anhand der neuesten
   Service- oder Checklistenhistorie.
@@ -47,7 +49,6 @@ Betrieb auf einem Raspberry Pi per Docker und Nginx bereitgestellt werden.
 - Datum, Kilometerstand, Beschreibung, Kosten, nächste Service-Kilometer und
   nächste Service-Termine speichern.
 - Belege hochladen und dem Serviceeintrag zuordnen.
-- Kosten nach Kategorie in der Detailansicht auswerten.
 
 ### Technische Daten
 
@@ -57,6 +58,8 @@ Betrieb auf einem Raspberry Pi per Docker und Nginx bereitgestellt werden.
 - Werte, Einheiten und Quellen dokumentieren.
 - Daten per Freitext, JSON-artigem Import oder CSV übernehmen.
 - CSV-Vorlage für technische Daten herunterladen.
+- Einträge und Kategorien per Drag & Drop neu anordnen; Reihenfolge wird
+  serverseitig gespeichert.
 
 ### Service-Checklisten
 
@@ -70,6 +73,13 @@ Betrieb auf einem Raspberry Pi per Docker und Nginx bereitgestellt werden.
 - Punktelisten über eine eigene Importseite einlesen.
 - Checklisten als erledigte Wartungsnachweise speichern.
 - Erledigte Punkte und Anmerkungen pro Durchführung erfassen.
+
+### Dokumente
+
+- Beliebige Dateien (PDF, Bilder, Belege) pro Motorrad speichern.
+- Kategorisierung und Benennung über die Upload-Seite.
+- Dokumente über den Reiter „Dokumente" in der Motorrad-Detailansicht
+  einsehen und löschen.
 
 ### Offline-Unterstützung
 
@@ -91,8 +101,9 @@ Betrieb auf einem Raspberry Pi per Docker und Nginx bereitgestellt werden.
 - Flask-SQLAlchemy
 - SQLite
 - Pillow für Bildoptimierung
+- fpdf2 für PDF-Erstellung (Backup-Zusammenfassung)
 - Gunicorn für Containerbetrieb
-- Docker Compose für Deployment
+- Docker für Deployment
 - Nginx als Reverse Proxy auf dem Raspberry Pi
 - Vanilla JavaScript für Menü, Offline-Speicher und Sync
 - IndexedDB für lokale Offline-Wartungseinträge
@@ -106,6 +117,7 @@ Flask-Login==0.6.3
 Flask-WTF==1.2.1
 Pillow==12.2.0
 pypdf==6.12.2
+fpdf2==2.8.5
 gunicorn==22.0.0
 Werkzeug==3.1.8
 ```
@@ -115,30 +127,40 @@ Werkzeug==3.1.8
 ```text
 .
 ├── app/
-│   ├── __init__.py              # Flask-App-Factory, Datenbank, Defaults
+│   ├── __init__.py              # Flask-App-Factory, Datenbank, Schema-Migrationen
 │   ├── models.py                # SQLAlchemy-Modelle
 │   ├── routes.py                # Views, API, Import, Sync, Hilfslogik
+│   ├── auth.py                  # Authentifizierung und Backup-Logik
+│   ├── export_pdf.py            # PDF-Zusammenfassung pro Motorrad (Backup)
 │   ├── utils.py                 # Parser, Uploads, Presets, Konstanten
 │   ├── static/
-│   │   ├── css/app.css          # Styling
-│   │   ├── js/app.js            # UI-Verhalten
+│   │   ├── css/app.css          # Styling (Dark Theme mit CSS-Variablen)
+│   │   ├── js/app.js            # UI-Verhalten (Tabs, Drag&Drop, Nav)
+│   │   ├── js/theme.js          # Farbschema-Umschaltung (localStorage)
 │   │   ├── js/indexeddb.js      # Offline-Datenbank im Browser
 │   │   ├── js/sync.js           # Sync-Logik
 │   │   ├── manifest.webmanifest # PWA-Manifest
 │   │   └── service-worker.js    # Service Worker
 │   └── templates/
 │       ├── base.html
+│       ├── _macros.html         # Wiederverwendbare Jinja-Makros
 │       ├── settings.html
 │       ├── motorcycles/
+│       │   ├── detail.html      # Tabs: Historie / Datenblatt / Dokumente
+│       │   └── ...
 │       ├── service/
-│       └── checklists/
+│       ├── checklists/
+│       └── documents/
+│           └── form.html        # Dokumentenupload-Seite
 ├── deploy/
 │   ├── README_RASPI.md          # Raspberry-Pi-Anleitung
+│   ├── UPDATE_RASPI.md          # Update-Ablauf auf dem Pi
 │   ├── nginx/
 │   └── update-on-pi.sh
 ├── instance/
 │   ├── motorcycle_service.sqlite3
 │   └── uploads/
+├── tests/
 ├── Dockerfile
 ├── compose.yaml
 ├── requirements.txt
@@ -161,14 +183,10 @@ Deployments und Backups besonders geschützt werden.
 ### Installation
 
 ```bash
-cd /Users/gregor/Documents/Codex/MotoDB
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 ```
-
-Falls bereits ein passendes Environment existiert, reicht es, dieses zu
-aktivieren und die Abhängigkeiten zu installieren.
 
 ### App starten
 
@@ -236,7 +254,9 @@ Zeichen lang sein.
 
 Die Datenbank wird über SQLAlchemy verwaltet. Beim Start erstellt die App die
 Tabellen automatisch, falls sie fehlen. Zusätzlich führt `ensure_schema_updates`
-kleine Schema-Nachziehungen für bestehende Datenbanken aus.
+kleine Schema-Nachziehungen für bestehende Datenbanken aus (ALTER TABLE,
+Backfill-Queries), damit alte Instanzen ohne Datenverlust aktualisiert werden
+können.
 
 ### Hauptmodelle
 
@@ -251,38 +271,45 @@ Speichert Stammdaten zu einem Motorrad:
 - Kennzeichen, VIN, Erstzulassung
 - Status `aktiv`
 - Notizen
-- Bildpfad
+- Bildpfad (Titelbild; Galerie über `MotorcycleImage`)
 
-Verknüpfungen:
+Verknüpfungen: `services`, `technical_specs`, `checklists`, `images`,
+`documents`
 
-- `services`
-- `technical_specs`
-- `checklists`
+#### `MotorcycleImage`
+
+Speichert einzelne Bilder eines Motorrads:
+
+- `path` — relativer Pfad unterhalb des Upload-Ordners
+- `original_name`
+- `position` — Sortierreihenfolge in der Galerie
+- `created_at`
+
+#### `MotorcycleDocument`
+
+Speichert Dokumente (PDF, Bilder, Belege) zu einem Motorrad:
+
+- `titel` — frei wählbarer Name
+- `kategorie`
+- `path` — relativer Pfad unterhalb des Upload-Ordners
+- `original_name`
+- `created_at`, `updated_at`
 
 #### `ServiceEntry`
 
 Speichert Wartungs-, Kosten- und Ereigniseinträge:
 
-- Motorrad-ID
-- Titel
-- Datum
-- Kilometerstand
-- Beschreibung
-- Kosten
-- Kategorie
+- Titel, Datum, Kilometerstand, Beschreibung, Kosten, Kategorie
 - Belegpfad und Originalname
-- nächste Service-Kilometer
-- nächstes Service-Datum
+- nächste Service-Kilometer und nächstes Service-Datum
 
 #### `TechnicalSpec`
 
 Speichert technische Daten pro Motorrad:
 
-- Name
-- Wert
-- Einheit
-- Kategorie
-- Quelle
+- Name, Wert, Einheit, Kategorie, Quelle
+- `position` — Sortierreihenfolge innerhalb der Kategorie; wird per
+  Drag & Drop in der Detailansicht verändert
 
 #### `ServiceChecklist`
 
@@ -291,25 +318,16 @@ Nachweis sein.
 
 Wichtige Felder:
 
-- Titel
-- Intervall in Kilometern
-- Intervall in Monaten
-- Datum
-- Kilometerstand
-- Anmerkungen
-- `is_template`
-- `source_template_id`
-- `completed_at`
+- Titel, Intervall in Kilometern, Intervall in Monaten
+- Datum, Kilometerstand, Anmerkungen
+- `is_template`, `source_template_id`, `completed_at`
 
 #### `ServiceChecklistItem`
 
 Speichert einzelne Prüfpunkte einer Checkliste:
 
-- Position
-- Text
-- Kommentarvorlage
-- erledigt/nicht erledigt
-- Anmerkung
+- Position, Text, Kommentarvorlage
+- `erledigt`, Anmerkung
 
 #### `AppSetting`
 
@@ -318,17 +336,58 @@ Backup-Pfad unter dem Schlüssel `backup_path` verwendet.
 
 ## Benutzeroberfläche
 
-Die Anwendung rendert serverseitig mit Jinja-Templates. Das Grundlayout liegt
-in `app/templates/base.html`.
+Die Anwendung rendert serverseitig mit Jinja2-Templates. Das Grundlayout liegt
+in `app/templates/base.html`; gemeinsame Makros (Seitenkopf,
+Motorrad-Selektor) sind in `app/templates/_macros.html` definiert.
 
-Hauptnavigation:
+### Farbschema
 
-- MotoDB-Startseite
-- Einstellungen
-- Sync
+Die App startet standardmäßig im Dark-Theme „Nachtschicht". Das Farbschema
+kann in den Einstellungen gewählt werden:
 
-Die App ist für mobile Nutzung gedacht. Das Menü ist kompakt gehalten und wird
-über `app/static/js/app.js` gesteuert.
+- **Nachtschicht** — dunkles Theme (Standard)
+- **Hell** — helles Theme
+- **System** — folgt dem Betriebssystem-Modus (`prefers-color-scheme`)
+
+Die Auswahl wird in `localStorage` unter dem Schlüssel `motodb-theme`
+gespeichert und beim nächsten Seitenaufruf sofort angewandt, bevor das erste
+Pixel gerendert wird (`app/static/js/theme.js`). Das CSS nutzt CSS-Variablen
+(`--bg`, `--surface`, `--text`, …); der Light-Mode überschreibt diese über
+`[data-theme="light"]` auf dem `<html>`-Element.
+
+**Wichtig für Entwicklung:** Die Content-Security-Policy (`script-src 'self'`
+und `style-src 'self'`) lässt keine Inline-`<script>`-Tags und keine
+`style=""`-Attribute zu. Neue JS-Logik gehört immer in externe `.js`-Dateien,
+neue Styles in `app.css`.
+
+### Navigation
+
+Die Fußleiste enthält drei Einträge:
+
+- **Übersicht** — Motorradliste
+- **+** (FAB) — neuer Serviceeintrag für das zuletzt gewählte Motorrad
+- **Profil** — Einstellungen / Konto
+
+### Motorrad-Detailansicht
+
+Die Detailseite (`/motorrad/<id>`) ist in drei Reiter aufgeteilt:
+
+| Reiter | Inhalt |
+| --- | --- |
+| **Historie** | Chronologische Liste aller Services und abgeschlossenen Checklisten |
+| **Datenblatt** | Technische Daten; inline editierbar; Kategorien und Einträge per Drag & Drop sortierbar |
+| **Dokumente** | Hochgeladene Dokumente; Direktlink zur Upload-Seite |
+
+### Einstellungen
+
+Die Einstellungsseite (`/einstellungen`) ist in Gruppen unterteilt:
+
+- **Darstellung** — Farbschema-Umschalter
+- **Konto** — Passwort ändern
+- **Daten und Backup** — Backup-Pfad und manuelles Backup
+- **Vorlagen und Import** — CSV-Vorlage Datenblatt, CSV-Vorlage Checklisten,
+  globaler Checklisten-Import
+- **Gefahrenzone** — Konto löschen; Admin: Benutzerverwaltung
 
 ## Checklisten
 
@@ -355,8 +414,8 @@ Vorhandene Presets:
 
 ### CSV-Vorlage
 
-Die Checklisten-Vorlage kann unter `Einstellungen` oder direkt über diese Route
-heruntergeladen werden:
+Die Checklisten-Vorlage kann unter `Einstellungen → Vorlagen und Import` oder
+direkt über diese Route heruntergeladen werden:
 
 ```text
 /checklisten/csv-vorlage
@@ -406,6 +465,12 @@ fahrzeugbezogene Einstiege:
 /motorrad/<id>/technik
 ```
 
+Im Reiter **Datenblatt** der Motorrad-Detailansicht können die Werte direkt
+inline bearbeitet werden (Autosave). Die Reihenfolge von Kategorien und
+Einträgen innerhalb einer Kategorie lässt sich per Drag & Drop verändern; die
+neue Reihenfolge wird sofort an den Server gesendet
+(`POST /motorrad/<id>/datenblatt/reihenfolge`).
+
 ### CSV-Vorlage
 
 Die Route `/technik/csv-vorlage` liefert eine Vorlage:
@@ -442,6 +507,21 @@ Alternativ kann ein einfaches JSON-Objekt importiert werden:
 
 Beim Speichern ersetzt die App die bisherigen technischen Daten des jeweiligen
 Motorrads durch die neu zusammengeführten Zeilen.
+
+## Dokumente
+
+Dokumente werden pro Motorrad unter `Einstellungen → Datenblatt → Dokumente`
+oder direkt über diese Route hochgeladen:
+
+```text
+/motorrad/<id>/dokumente/neu
+```
+
+Auf der Upload-Seite können Titel, Kategorie und Datei angegeben werden. Die
+Datei wird im Upload-Ordner unter `<motorrad_id>/documents/` abgelegt.
+
+Vorhandene Dokumente werden im Reiter **Dokumente** der Motorrad-Detailansicht
+aufgelistet und können dort geöffnet oder gelöscht werden.
 
 ## Offline-Sync
 
@@ -574,6 +654,7 @@ Die Pfade sind pro Motorrad organisiert:
 ```text
 instance/uploads/<motorrad_id>/images/
 instance/uploads/<motorrad_id>/receipts/
+instance/uploads/<motorrad_id>/documents/
 ```
 
 Für Bilder wird Pillow verwendet. Beim Upload werden Bilder:
@@ -589,8 +670,9 @@ normalisiert. Uploads sind auf maximal `32 MB` begrenzt.
 
 ## Backups
 
-Der Backup-Pfad wird in der App unter `Einstellungen` gepflegt. Intern liegt er
-als `AppSetting` mit dem Schlüssel `backup_path` in der Datenbank.
+Der Backup-Pfad wird in der App unter `Einstellungen → Daten und Backup`
+gepflegt. Intern liegt er als `AppSetting` mit dem Schlüssel `backup_path`
+in der Datenbank.
 
 Wenn ein gültiger Pfad gesetzt ist, erstellt `POST /api/sync` vor der
 Übernahme von Offline-Daten einen Sicherungsordner:
@@ -599,10 +681,23 @@ Wenn ein gültiger Pfad gesetzt ist, erstellt `POST /api/sync` vor der
 motorrad_service_sync_<YYYYMMDD_HHMMSS>/
 ```
 
-Darin landen:
+### Manuelles Backup (ZIP-Download)
 
-- `motorcycle_service.sqlite3`
-- eine Kopie des Upload-Ordners
+Über `Einstellungen → Daten und Backup` kann ein ZIP-Archiv heruntergeladen
+werden. Es enthält für jedes Motorrad einen eigenen Unterordner mit:
+
+- `daten.json` — vollständige Daten des Motorrads im JSON-Format
+- `zusammenfassung.pdf` — lesbare PDF-Zusammenfassung mit:
+  - Titelbild des Motorrads (wenn vorhanden)
+  - Seite 1: Fahrzeugdaten (Stammdaten, Kaufpreis, Kennzeichen usw.)
+  - Seite 2: Technische Daten in zweispaltigem Raster pro Kategorie
+  - Seite 3: Servicehistorie (alle Services und abgeschlossene Checklisten)
+- `profil.json` — Nutzerprofil
+
+Zusätzlich liegen alle hochgeladenen Bilder, Belege und Dokumente im Archiv.
+
+Die PDF wird von `app/export_pdf.py` erzeugt. Technische Grundlage ist
+`fpdf2 2.8.5` (latin-1 Zeichensatz).
 
 Auf dem Raspberry Pi ist als Backup-Pfad vorgesehen:
 
@@ -667,7 +762,7 @@ Darin beschrieben sind:
 - Kopieren per `rsync`
 - Migration vorhandener Daten
 - `.env` auf dem Pi
-- Docker-Compose-Start
+- Docker-Start
 - Nginx-Konfiguration
 - Firewall
 - Backup-Pfad
@@ -680,8 +775,7 @@ einem Reverse Proxy laufen. Vor dem Start der öffentlichen Instanz:
 
 1. `.env` mit einem langen `SECRET_KEY` füllen.
 2. `MOTODB_PUBLIC_HOSTING=true` setzen.
-3. Bei einem Reverse Proxy `MOTODB_TRUST_PROXY_HEADERS=true` setzen. Die
-   mitgelieferte `compose.yaml` setzt diesen Wert für den Nginx-Pfad bereits.
+3. Bei einem Reverse Proxy `MOTODB_TRUST_PROXY_HEADERS=true` setzen.
 4. Den ersten Admin einer neuen Datenbank einmalig über
    `MOTODB_ADMIN_USERNAME`, `MOTODB_ADMIN_EMAIL` und
    `MOTODB_ADMIN_PASSWORD` bootstrappen.
@@ -697,9 +791,7 @@ Uploads werden nur noch nach Login und Eigentümerprüfung ausgeliefert.
 
 HTTP-Deployments im Heimnetz dürfen `MOTODB_PUBLIC_HOSTING` nicht aktivieren.
 Sichere Session-Cookies werden über HTTP vom Browser nicht gespeichert; der
-Login kann dann nicht abgeschlossen werden. Für Public Hosting muss die
-externe URL über HTTPS laufen und bei einem Reverse Proxy muss Flask das
-HTTPS-Schema über die Proxy-Header sehen.
+Login kann dann nicht abgeschlossen werden.
 
 ## Wichtige Routen
 
@@ -707,13 +799,19 @@ HTTPS-Schema über die Proxy-Header sehen.
 | --- | --- |
 | `/` | Motorradübersicht mit Suche und Sortierung |
 | `/motorrad/neu` | Motorrad anlegen |
-| `/motorrad/<id>` | Motorrad-Detailansicht |
+| `/motorrad/<id>` | Motorrad-Detailansicht (Tabs: Historie / Datenblatt / Dokumente) |
 | `/motorrad/<id>/bearbeiten` | Motorrad bearbeiten |
 | `/motorrad/<id>/service/neu` | Serviceeintrag anlegen |
 | `/service/<id>/bearbeiten` | Serviceeintrag bearbeiten |
+| `/service/<id>/ansicht` | Serviceeintrag anzeigen |
+| `/motorrad/<id>/technik` | Technische Daten für ein Motorrad (CSV/Text-Import) |
+| `/motorrad/<id>/datenblatt` | Technische Daten inline speichern (POST) |
+| `/motorrad/<id>/datenblatt/reihenfolge` | Reihenfolge per Drag & Drop speichern (POST JSON) |
 | `/technik` | Technische Daten global bearbeiten |
-| `/motorrad/<id>/technik` | Technische Daten für ein Motorrad |
 | `/technik/csv-vorlage` | CSV-Vorlage für technische Daten |
+| `/motorrad/<id>/dokumente/neu` | Dokument hochladen |
+| `/dokumente` | Dokumente hochladen (POST) |
+| `/dokumente/<id>/loeschen` | Dokument löschen (POST) |
 | `/checklisten/neu` | Checkliste global anlegen |
 | `/checklisten/import` | Punkteliste global importieren |
 | `/motorrad/<id>/checklisten` | Checklisten eines Motorrads |
@@ -802,21 +900,24 @@ Prüfen:
 
 ### Technische Daten werden ersetzt
 
-Beim Speichern technischer Daten löscht die App zunächst alle vorhandenen
-technischen Daten des Motorrads und legt anschließend die neu importierten oder
-eingegebenen Werte an. Vor größeren Importen ist ein Backup sinnvoll.
+Beim Speichern technischer Daten (CSV/Text-Import) löscht die App zunächst alle
+vorhandenen technischen Daten des Motorrads und legt die neu importierten Werte
+an. Die per Drag & Drop gespeicherte Reihenfolge bleibt durch `position`-Werte
+erhalten. Vor größeren Importen ist ein Backup sinnvoll.
 
 ## Entwicklungsnotizen
 
-- Manuelle Schemaänderungen werden aktuell direkt beim App-Start in
-  `ensure_schema_updates` durchgeführt.
-- Für größere Datenbankänderungen wäre langfristig eine Migration mit Alembic
-  oder Flask-Migrate sinnvoll.
+- Manuelle Schemaänderungen werden beim App-Start in `ensure_schema_updates`
+  durchgeführt (ALTER TABLE + Backfill). Für größere Datenbankänderungen wäre
+  langfristig eine Migration mit Alembic oder Flask-Migrate sinnvoll.
 - Die JSON-API ist auf Offline- und Sync-Funktionen ausgelegt und noch keine
   vollständige öffentliche REST-API.
 - Löschen eines Motorrads entfernt auch die zugehörigen Uploads.
 - Serviceeinträge und Checklistenhistorien beeinflussen den angezeigten
   Kilometerstand.
+- Die CSP (`script-src 'self'`, `style-src 'self'`) lässt keine
+  Inline-`<script>`-Tags und keine `style=""`-Attribute zu. Alle JS-Ergänzungen
+  gehören in externe `.js`-Dateien, alle Styles in `app.css`.
 - Bei Produktivbetrieb sollte die App ausschließlich hinter Gunicorn und Nginx
   laufen, nicht mit dem Flask-Debug-Server.
 
