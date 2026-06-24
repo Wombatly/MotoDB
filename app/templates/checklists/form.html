@@ -5,7 +5,7 @@
 {% set back_url = url_for('main.checklist_index', motorrad_id=motorcycle.id) if motorcycle else url_for('main.index') %}
 
 {% block content %}
-{{ page_header("Checkliste bearbeiten" if checklist else "Checkliste anlegen", "Vorlage mit Prüfpunkten und Kommentaren speichern.", back_url) }}
+{{ page_header("Checkliste bearbeiten" if checklist else "Checkliste anlegen", "Vorlage mit Prüfpunkten und Kommentaren speichern.", back_url, help_key="checklisten") }}
 
 <form method="post" class="form-panel">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -107,12 +107,14 @@
   <div class="form-actions mt-4">
     <button class="btn btn-primary" type="submit">{% if checklist %}Speichern{% else %}Anlegen{% endif %}</button>
     {% if checklist %}
-      <form method="post" action="{{ url_for('main.checklist_delete', checklist_id=checklist.id) }}" data-confirm="Diese Vorlage wirklich löschen?">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <input type="hidden" name="next" value="{{ back_url }}">
-        <button class="btn btn-outline-danger" type="submit">Löschen</button>
-      </form>
+      <button class="btn btn-outline-danger" type="submit" form="checklist-delete-form">Löschen</button>
     {% endif %}
   </div>
 </form>
+{% if checklist %}
+  <form id="checklist-delete-form" method="post" action="{{ url_for('main.checklist_delete', checklist_id=checklist.id) }}" data-confirm="Diese Vorlage wirklich löschen?">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="next" value="{{ back_url }}">
+  </form>
+{% endif %}
 {% endblock %}

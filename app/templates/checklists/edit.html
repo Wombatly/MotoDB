@@ -5,7 +5,7 @@
 {% set subtitle = motorcycle.marke ~ " " ~ motorcycle.modell ~ (" · unveränderlich gespeichert" if not checklist.is_template else "") %}
 
 {% block content %}
-{{ page_header("Checkliste ausfüllen" if checklist.is_template else "Checklisten-Datensatz", subtitle, url_for('main.motorcycle_detail', motorrad_id=motorcycle.id)) }}
+{{ page_header("Checkliste ausfüllen" if checklist.is_template else "Checklisten-Datensatz", subtitle, url_for('main.motorcycle_detail', motorrad_id=motorcycle.id), help_key="checklisten") }}
 
 <form method="post" class="form-panel">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -51,12 +51,14 @@
       <button class="btn btn-primary" type="submit">Als Datensatz speichern</button>
       <a class="btn btn-outline-secondary" href="{{ url_for('main.motorcycle_detail', motorrad_id=motorcycle.id) }}">Abbrechen</a>
     {% else %}
-      <form method="post" action="{{ url_for('main.checklist_delete', checklist_id=checklist.id) }}" data-confirm="Diesen Datensatz wirklich löschen?">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <input type="hidden" name="next" value="{{ url_for('main.motorcycle_detail', motorrad_id=motorcycle.id) }}">
-        <button class="btn btn-outline-danger" type="submit">Löschen</button>
-      </form>
+      <button class="btn btn-outline-danger" type="submit" form="checklist-delete-form">Löschen</button>
     {% endif %}
   </div>
 </form>
+{% if not checklist.is_template %}
+  <form id="checklist-delete-form" method="post" action="{{ url_for('main.checklist_delete', checklist_id=checklist.id) }}" data-confirm="Diesen Datensatz wirklich löschen?">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="next" value="{{ url_for('main.motorcycle_detail', motorrad_id=motorcycle.id) }}">
+  </form>
+{% endif %}
 {% endblock %}
