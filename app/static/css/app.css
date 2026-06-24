@@ -919,6 +919,13 @@ a {
   z-index: 2;
 }
 
+.detail-hero__help {
+  position: absolute;
+  right: 3.85rem;
+  top: 1rem;
+  z-index: 2;
+}
+
 .detail-hero__edit svg {
   height: 1.05rem;
   width: 1.05rem;
@@ -1938,4 +1945,148 @@ a {
   .app-main.py-3 {
     padding-bottom: calc(9rem + env(safe-area-inset-bottom));
   }
+}
+
+/* ---------- Kontextsensitive Hilfe ---------- */
+.help-trigger svg {
+  width: 1.15rem;
+  height: 1.15rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.help-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgb(0 0 0 / 50%);
+  z-index: 1040;
+}
+
+.help-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(420px, 92vw);
+  z-index: 1050;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-left: 1px solid var(--line);
+  box-shadow: var(--shadow);
+  animation: help-slide-in 0.2s ease-out;
+}
+
+@keyframes help-slide-in {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+.help-panel__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.help-panel__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.25rem;
+}
+
+.help-panel__foot {
+  padding: 0.85rem 1.25rem;
+  border-top: 1px solid var(--line);
+}
+
+.help-lead {
+  color: var(--text);
+  margin-bottom: 1rem;
+}
+
+.help-section__title {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin: 1.1rem 0 0.5rem;
+}
+
+.help-list {
+  margin: 0 0 0.5rem;
+  padding-left: 1.1rem;
+  color: var(--text);
+}
+
+.help-list li {
+  margin-bottom: 0.5rem;
+  line-height: 1.5;
+}
+
+.help-list code,
+.help-tip code {
+  background: var(--surface-sunken);
+  border: 1px solid var(--line);
+  border-radius: 0.3rem;
+  padding: 0.05rem 0.35rem;
+  font-size: 0.85em;
+}
+
+.help-tip {
+  margin-top: 1.1rem;
+  padding: 0.75rem 0.9rem;
+  background: var(--primary-soft);
+  border: 1px solid var(--primary-line);
+  border-radius: 0.6rem;
+  color: var(--text);
+}
+
+body.help-open {
+  overflow: hidden;
+}
+
+/* ---------- Hilfe-Übersichtsseite ---------- */
+.help-page__item {
+  border: 1px solid var(--line);
+  border-radius: 0.7rem;
+  background: var(--surface);
+  margin-bottom: 0.75rem;
+  overflow: hidden;
+}
+
+.help-page__item > summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 0.9rem 1.1rem;
+  font-weight: 600;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.help-page__item > summary::-webkit-details-marker {
+  display: none;
+}
+
+.help-page__item > summary::after {
+  content: "+";
+  color: var(--text-muted);
+  font-size: 1.3rem;
+  line-height: 1;
+}
+
+.help-page__item[open] > summary::after {
+  content: "–";
+}
+
+.help-page__content {
+  padding: 0 1.1rem 1rem;
+  border-top: 1px solid var(--line);
 }

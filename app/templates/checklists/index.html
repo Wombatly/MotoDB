@@ -3,7 +3,7 @@
 {% block title %}Checklisten-Vorlagen{% endblock %}
 
 {% block content %}
-{% call page_header("Checklisten-Vorlagen", motorcycle.marke ~ " " ~ motorcycle.modell, url_for('main.motorcycle_detail', motorrad_id=motorcycle.id)) %}
+{% call page_header("Checklisten-Vorlagen", motorcycle.marke ~ " " ~ motorcycle.modell, url_for('main.motorcycle_detail', motorrad_id=motorcycle.id), help_key="checklisten") %}
   <a class="btn btn-primary" href="{{ url_for('main.checklist_new', motorrad_id=motorcycle.id) }}">+ Neu</a>
   <a class="btn btn-outline-secondary" href="{{ url_for('main.checklist_import', motorrad_id=motorcycle.id) }}">Import</a>
 {% endcall %}

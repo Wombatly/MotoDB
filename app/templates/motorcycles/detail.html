@@ -1,8 +1,11 @@
 {% extends "base.html" %}
+{% from "_macros.html" import help_button, help_drawer %}
 {% block title %}{{ motorcycle.marke }} {{ motorcycle.modell }}{% endblock %}
 
 {% block content %}
+{{ help_drawer("motorrad_detail") }}
 <section class="detail-hero mb-3">
+  <div class="detail-hero__help">{{ help_button("motorrad_detail") }}</div>
   <a class="detail-hero__edit btn btn-outline-secondary btn-icon" href="{{ url_for('main.motorcycle_edit', motorrad_id=motorcycle.id) }}" aria-label="Bearbeiten" title="Bearbeiten">
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <path d="M12 20h9"></path>

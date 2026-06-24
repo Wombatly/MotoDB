@@ -3,7 +3,7 @@
 {% block title %}Nutzerverwaltung{% endblock %}
 
 {% block content %}
-{{ page_header("Admin", "Nutzer, Rollen und Datenbestand verwalten.", url_for('main.settings')) }}
+{{ page_header("Admin", "Nutzer, Rollen und Datenbestand verwalten.", url_for('main.settings'), help_key="admin") }}
 
 {% if users %}
   <section class="overview-strip mb-3" aria-label="Admin Übersicht">

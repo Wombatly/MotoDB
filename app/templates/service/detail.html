@@ -3,7 +3,7 @@
 {% block title %}{{ service.titel or "Service" }}{% endblock %}
 
 {% block content %}
-{{ page_header(service.titel or "Service", motorcycle.marke ~ " " ~ motorcycle.modell, url_for('main.motorcycle_detail', motorrad_id=motorcycle.id)) }}
+{{ page_header(service.titel or "Service", motorcycle.marke ~ " " ~ motorcycle.modell, url_for('main.motorcycle_detail', motorrad_id=motorcycle.id), help_key="service") }}
 
 <section class="form-panel">
   <div class="mb-3">

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import help_button, help_drawer %}
 {% block title %}Datenschutz{% endblock %}
 
 {% block content %}
@@ -7,7 +8,9 @@
     <h1 class="h3 mb-1">Datenschutz</h1>
     <p class="text-secondary mb-0">Welche Daten MotoDB verarbeitet und welche Kontrolle du hast.</p>
   </div>
+  <div class="page-head__actions">{{ help_button("datenschutz") }}</div>
 </div>
+{{ help_drawer("datenschutz") }}
 
 <section class="form-panel mt-3">
   <h2 class="h5 mb-3">Verantwortlicher</h2>

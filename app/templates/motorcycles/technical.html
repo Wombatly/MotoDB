@@ -5,7 +5,7 @@
 {% set back_url = url_for('main.motorcycle_detail', motorrad_id=motorcycle.id) if motorcycle else url_for('main.index') %}
 
 {% block content %}
-{{ page_header("Technische Daten", "Technische Werte einem Motorrad zuordnen.", back_url) }}
+{{ page_header("Technische Daten", "Technische Werte einem Motorrad zuordnen.", back_url, help_key="technik") }}
 
 <form method="post" enctype="multipart/form-data" class="form-panel">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

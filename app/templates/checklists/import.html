@@ -5,7 +5,7 @@
 {% set back_url = url_for('main.checklist_index', motorrad_id=motorcycle.id) if motorcycle else url_for('main.index') %}
 
 {% block content %}
-{{ page_header("Checklisten", "Punkteliste einem Motorrad zuordnen.", back_url) }}
+{{ page_header("Checklisten", "Punkteliste einem Motorrad zuordnen.", back_url, help_key="checklisten") }}
 
 <form method="post" enctype="multipart/form-data" class="form-panel">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

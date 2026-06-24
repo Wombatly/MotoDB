@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import help_button, help_drawer %}
 {% block title %}Profil · Einstellungen{% endblock %}
 
 {% block content %}
@@ -7,7 +8,9 @@
     <h1 class="h3 mb-1">Profil</h1>
     <p class="text-secondary mb-0">{{ current_user.email }}</p>
   </div>
+  <div class="page-head__actions">{{ help_button("profil") }}</div>
 </div>
+{{ help_drawer("profil") }}
 
 <p class="settings-label">Darstellung</p>
 <div class="settings-list">
@@ -113,6 +116,8 @@
 </div>
 
 <p class="mt-4">
+  <a href="{{ url_for('main.help_page') }}">Hilfe &amp; Bedienung</a>
+  &nbsp;·&nbsp;
   <a href="{{ url_for('main.privacy') }}">Datenschutzhinweise</a>
 </p>
 {% endblock %}

@@ -3,7 +3,7 @@
 {% block title %}{{ title }}{% endblock %}
 
 {% block content %}
-{{ page_header(title, motorcycle.marke ~ " " ~ motorcycle.modell, url_for('main.motorcycle_detail', motorrad_id=motorcycle.id)) }}
+{{ page_header(title, motorcycle.marke ~ " " ~ motorcycle.modell, url_for('main.motorcycle_detail', motorrad_id=motorcycle.id), help_key="service") }}
 
 <form method="post" enctype="multipart/form-data" class="form-panel" {% if not service.id %}data-offline-service-form{% endif %} data-motorrad-id="{{ motorcycle.id }}">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

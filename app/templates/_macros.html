@@ -1,16 +1,57 @@
-{% macro page_header(title, subtitle=None, back_url=None) %}
+{% macro help_button(key) %}
+{% set topic = help_topic(key) %}
+{% if topic %}
+<button type="button" class="btn btn-outline-secondary btn-icon help-trigger" data-help-open="{{ key }}" aria-label="Hilfe: {{ topic.title }}" title="Hilfe zu dieser Seite">
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <circle cx="12" cy="12" r="9"></circle>
+    <path d="M9.6 9.2a2.5 2.5 0 1 1 3.6 2.4c-.8.5-1.2 1-1.2 1.9"></path>
+    <path d="M12 17h.01"></path>
+  </svg>
+</button>
+{% endif %}
+{% endmacro %}
+
+{% macro help_drawer(key) %}
+{% set topic = help_topic(key) %}
+{% if topic %}
+<div class="help-overlay" data-help-overlay hidden></div>
+<aside class="help-panel" id="help-{{ key }}" data-help-panel role="dialog" aria-modal="true" aria-labelledby="help-{{ key }}-title" hidden>
+  <div class="help-panel__head">
+    <h2 class="h5 mb-0" id="help-{{ key }}-title">{{ topic.title }}</h2>
+    <button type="button" class="toast-close" data-help-close aria-label="Hilfe schließen">×</button>
+  </div>
+  <div class="help-panel__body">
+    {% if topic.lead %}<p class="help-lead">{{ topic.lead|safe }}</p>{% endif %}
+    {% for section in topic.sections %}
+      {% if section.heading %}<h3 class="help-section__title">{{ section.heading }}</h3>{% endif %}
+      <ul class="help-list">
+        {% for item in section.points %}<li>{{ item|safe }}</li>{% endfor %}
+      </ul>
+    {% endfor %}
+    {% if topic.tip %}<p class="help-tip">💡 {{ topic.tip|safe }}</p>{% endif %}
+  </div>
+  <div class="help-panel__foot">
+    <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('main.help_page') }}#{{ key }}">Alle Hilfethemen</a>
+  </div>
+</aside>
+{% endif %}
+{% endmacro %}
+
+{% macro page_header(title, subtitle=None, back_url=None, help_key=None) %}
 <div class="page-head">
   <div>
     <h1 class="h3 mb-1">{{ title }}</h1>
     {% if subtitle %}<p class="text-secondary mb-0">{{ subtitle }}</p>{% endif %}
   </div>
-  {% if back_url or caller is defined %}
+  {% if back_url or help_key or caller is defined %}
     <div class="page-head__actions">
       {% if caller is defined %}{{ caller() }}{% endif %}
+      {% if help_key %}{{ help_button(help_key) }}{% endif %}
       {% if back_url %}<a class="btn btn-outline-secondary" href="{{ back_url }}">Zurück</a>{% endif %}
     </div>
   {% endif %}
 </div>
+{% if help_key %}{{ help_drawer(help_key) }}{% endif %}
 {% endmacro %}
 
 {% macro motorcycle_select(motorcycles, selected, nav_url=None, label="Motorrad", required=True) %}

@@ -1,11 +1,14 @@
 {% extends "base.html" %}
+{% from "_macros.html" import help_button, help_drawer %}
 
 {% block content %}
+{{ help_drawer("konto") }}
 <div class="container mt-5">
     <div class="row justify-content-center">
         <div class="col-md-6">
             <div class="card">
                 <div class="card-body">
+                    <div class="d-flex justify-content-end">{{ help_button("konto") }}</div>
                     <h2 class="card-title text-center mb-4">Registrieren</h2>
                     <form method="POST">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

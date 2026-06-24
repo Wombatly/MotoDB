@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% from "_macros.html" import page_header %}
+{% block title %}Hilfe{% endblock %}
+
+{% block content %}
+{{ page_header("Hilfe", "Wie MotoDB funktioniert – alle Bereiche erklärt.", url_for('main.settings')) }}
+
+<p class="text-secondary">
+  Tipp: Auf jeder Seite öffnet das <strong>?</strong>-Symbol oben rechts die passende Hilfe direkt zum aktuellen Bereich.
+</p>
+
+{% for key, topic in help_topics().items() %}
+<details class="help-page__item" id="{{ key }}">
+  <summary>{{ topic.title }}</summary>
+  <div class="help-page__content">
+    {% if topic.lead %}<p class="help-lead">{{ topic.lead|safe }}</p>{% endif %}
+    {% for section in topic.sections %}
+      {% if section.heading %}<h3 class="help-section__title">{{ section.heading }}</h3>{% endif %}
+      <ul class="help-list">
+        {% for item in section.points %}<li>{{ item|safe }}</li>{% endfor %}
+      </ul>
+    {% endfor %}
+    {% if topic.tip %}<p class="help-tip">💡 {{ topic.tip|safe }}</p>{% endif %}
+  </div>
+</details>
+{% endfor %}
+{% endblock %}

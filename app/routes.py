@@ -23,6 +23,7 @@ from flask_login import login_required, current_user
 
 from app import db
 from app.auth import admin_required
+from app.help_content import HELP_TOPICS
 from app.models import (
     AppSetting,
     Motorcycle,
@@ -176,6 +177,19 @@ def inject_settings():
     }
 
 
+# Hilfetexte als Jinja-Globals registrieren (NICHT als Context-Processor):
+# Mit `{% from "_macros.html" import ... %}` importierte Macros sehen nur
+# Environment-Globals, keine Context-Processor-Variablen.
+@bp.app_template_global("help_topic")
+def help_topic(key):
+    return HELP_TOPICS.get(key)
+
+
+@bp.app_template_global("help_topics")
+def help_topics():
+    return HELP_TOPICS
+
+
 @bp.app_template_filter("number")
 def number_filter(value):
     if value in (None, ""):
@@ -297,6 +311,12 @@ def settings():
 @bp.route("/datenschutz")
 def privacy():
     return render_template("privacy.html")
+
+
+@bp.route("/hilfe")
+@login_required
+def help_page():
+    return render_template("help.html")
 
 
 @bp.route("/dokumente", methods=["GET", "POST"])

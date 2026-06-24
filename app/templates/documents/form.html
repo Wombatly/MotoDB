@@ -5,7 +5,7 @@
 {% set back_url = url_for('main.motorcycle_detail', motorrad_id=motorcycle.id) ~ '#tab-dokumente' %}
 
 {% block content %}
-{{ page_header("Dokument hinzufügen", motorcycle.marke ~ " " ~ motorcycle.modell, back_url) }}
+{{ page_header("Dokument hinzufügen", motorcycle.marke ~ " " ~ motorcycle.modell, back_url, help_key="dokumente") }}
 
 <form method="post" action="{{ url_for('main.documents') }}" enctype="multipart/form-data" class="form-panel">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

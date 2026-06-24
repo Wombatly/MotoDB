@@ -3,7 +3,7 @@
 {% block title %}Dokumente{% endblock %}
 
 {% block content %}
-{{ page_header("Dokumente", "Fahrzeugschein, ABEs, Gutachten und weitere Unterlagen.") }}
+{{ page_header("Dokumente", "Fahrzeugschein, ABEs, Gutachten und weitere Unterlagen.", help_key="dokumente") }}
 
 {% if motorcycles %}
   <form class="form-panel mb-3" method="get" action="{{ url_for('main.documents') }}">

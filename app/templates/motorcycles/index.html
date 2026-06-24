@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import help_button, help_drawer %}
 {% block title %}Motorräder{% endblock %}
 
 {% block content %}
@@ -7,7 +8,9 @@
     <h1 class="h3 mb-1">Garage</h1>
     <p class="text-secondary mb-0">Deine Maschinen auf einen Blick.</p>
   </div>
+  <div class="page-head__actions">{{ help_button("uebersicht") }}</div>
 </div>
+{{ help_drawer("uebersicht") }}
 
 {% if motorcycles %}
   <div class="motorcycle-grid">

@@ -1,13 +1,16 @@
 {% extends "base.html" %}
+{% from "_macros.html" import help_button, help_drawer %}
 
 {% block title %}Profil löschen{% endblock %}
 
 {% block content %}
+{{ help_drawer("konto") }}
 <div class="d-flex align-items-start justify-content-between gap-3 mb-3">
   <div>
     <h1 class="h3 mb-1 text-danger">Profil löschen</h1>
     <p class="text-secondary mb-0">{{ current_user.email }}</p>
   </div>
+  {{ help_button("konto") }}
   <a class="btn btn-outline-secondary" href="{{ url_for('main.settings') }}">Zurück</a>
 </div>
 
