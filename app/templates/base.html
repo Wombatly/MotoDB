@@ -30,7 +30,7 @@
                 <path d="M6 22v-4h4"></path>
               </svg>
             </button>
-          {% else %}
+          {% elif request.endpoint not in ('auth.login', 'auth.register') %}
             <a class="btn btn-outline-secondary" href="{{ url_for('auth.login') }}">Anmelden</a>
           {% endif %}
         </div>

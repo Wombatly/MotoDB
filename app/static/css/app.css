@@ -149,7 +149,6 @@
 [data-theme="logbuch"] .empty-state { border-color: rgb(42 39 31 / 30%); }
 
 [data-theme="logbuch"] .brand-mark { border-radius: 8px; box-shadow: 0 10px 22px rgb(47 92 116 / 16%); }
-[data-theme="logbuch"] .brand-mark--large { border-radius: 12px; }
 [data-theme="logbuch"] .btn,
 [data-theme="logbuch"] .btn-icon,
 [data-theme="logbuch"] .chip,
@@ -309,13 +308,6 @@ a {
   justify-content: center;
   letter-spacing: 0;
   width: 2.35rem;
-}
-
-.brand-mark--large {
-  border-radius: 18px;
-  font-size: 2rem;
-  height: 5rem;
-  width: 5rem;
 }
 
 .nav-menu {
@@ -2008,7 +2000,7 @@ a {
 .auth-brand h1 {
   font-size: clamp(2.3rem, 10vw, 3.3rem);
   letter-spacing: 0;
-  margin: 1.25rem 0 .4rem;
+  margin: 0 0 .4rem;
 }
 
 .auth-brand p {
@@ -2161,9 +2153,11 @@ a {
 
 /* ---------- Kontextsensitive Hilfe ---------- */
 .auth-help {
+  align-items: center;
   display: flex;
-  justify-content: flex-end;
-  margin-top: 0.75rem;
+  gap: 0.75rem;
+  justify-content: center;
+  margin-top: 1rem;
 }
 
 .help-trigger svg {
