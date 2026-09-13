@@ -38,6 +38,7 @@ from app.utils import (
     CATEGORIES,
     SERVICE_CHECKLIST_PRESETS,
     TECHNICAL_SPEC_SUGGESTIONS,
+    InvalidDateError,
     parse_date,
     parse_checklist_csv,
     parse_checklist_item_file,
@@ -62,6 +63,11 @@ def _max_storage_mb():
 MAX_USER_STORAGE_BYTES = _max_storage_mb() * 1024 * 1024  # Limit pro Account
 
 
+def storage_limit_message(suffix):
+    """Einheitliche Meldung fuer das konfigurierte Speicherlimit (MOTODB_MAX_STORAGE_MB)."""
+    return f"Speicherlimit von {MAX_USER_STORAGE_BYTES // (1024 * 1024)} MB erreicht {suffix}"
+
+
 def require_motorcycle_ownership(motorcycle_id):
     """Verify current user owns the motorcycle."""
     motorcycle = db.get_or_404(Motorcycle, motorcycle_id)
@@ -76,7 +82,9 @@ def current_user_motorcycles_query():
 
 def safe_next_url(next_url):
     """Return next_url only if it is a safe, app-internal relative path."""
-    if next_url and next_url.startswith("/") and not next_url.startswith("//"):
+    # "//host" und "/\host" werden von Browsern als protokoll-relative URL
+    # interpretiert und waeren ein Open Redirect.
+    if next_url and next_url.startswith("/") and not next_url.startswith(("//", "/\\")):
         return next_url
     return None
 
@@ -175,6 +183,30 @@ def inject_settings():
         "backup_path": get_backup_path(),
         "disk_usage": get_disk_usage(),
     }
+
+
+@bp.errorhandler(InvalidDateError)
+def handle_invalid_date(error):
+    """Ungueltige Datumsangaben sauber beantworten statt mit 500.
+
+    Formular-Routen sind GET+POST auf derselben URL: Rollback, Hinweis und
+    zurueck auf das Formular. API-Routen bekommen JSON mit Status 400.
+    """
+    db.session.rollback()
+    if request.path.startswith("/api/"):
+        return api_error("Ungueltiges Datum. Erwartet wird das Format YYYY-MM-DD.")
+    flash("Ungültiges Datum. Bitte im Format JJJJ-MM-TT eingeben.", "danger")
+    return redirect(request.full_path.rstrip("?"))
+
+
+def api_error(message, status=400):
+    return jsonify({"error": message}), status
+
+
+def api_json_object():
+    """JSON-Body als dict; None, wenn kein JSON-Objekt gesendet wurde."""
+    data = request.get_json(silent=True)
+    return data if isinstance(data, dict) else None
 
 
 # Hilfetexte als Jinja-Globals registrieren (NICHT als Context-Processor):
@@ -286,8 +318,21 @@ def backup_path_update():
     if not setting:
         setting = AppSetting(key="backup_path")
         db.session.add(setting)
-    setting.value = request.form.get("backup_path", "").strip() or "/PFAD/ZUM/SICHERUNGSORDNER"
+    setting.value = request.form.get("backup_path", "").strip() or BACKUP_PATH_PLACEHOLDER
     db.session.commit()
+    return redirect(url_for("main.settings"))
+
+
+@bp.route("/settings/backup", methods=["POST"])
+@login_required
+@admin_required
+def backup_create():
+    try:
+        target = create_server_backup()
+    except BackupError as error:
+        flash(str(error), "danger")
+    else:
+        flash(f"Backup erstellt: {target}", "success")
     return redirect(url_for("main.settings"))
 
 
@@ -329,7 +374,7 @@ def documents():
         success_redirect = redirect(next_url or url_for("main.documents", motorrad_id=motorcycle.id))
         document_file = request.files.get("document")
         if storage_quota_exceeded(current_user.id, [document_file]):
-            flash("Speicherlimit von 500 MB erreicht. Bitte lösche zuerst Dateien.", "danger")
+            flash(storage_limit_message("– bitte lösche zuerst Dateien."), "danger")
             return success_redirect
         document_path, original_name = save_upload(document_file, motorcycle.id, "documents")
         if document_path:
@@ -495,7 +540,7 @@ def motorcycle_new():
         db.session.flush()
         uploaded_images = request.files.getlist("bilder") or [request.files.get("bild")]
         if storage_quota_exceeded(current_user.id, uploaded_images):
-            flash("Speicherlimit von 500 MB erreicht – Bilder wurden nicht gespeichert.", "danger")
+            flash(storage_limit_message("– Bilder wurden nicht gespeichert."), "danger")
         else:
             add_motorcycle_images(motorcycle, uploaded_images)
         db.session.commit()
@@ -507,7 +552,6 @@ def motorcycle_new():
 @login_required
 def motorcycle_detail(motorrad_id):
     motorcycle = require_motorcycle_ownership(motorrad_id)
-    ensure_motorcycle_mileage_is_current(motorcycle)
     gallery_images = ordered_motorcycle_images(motorcycle)
     primary_image = gallery_images[0] if gallery_images else None
     services = (
@@ -583,12 +627,11 @@ def motorcycle_detail(motorrad_id):
 @login_required
 def motorcycle_edit(motorrad_id):
     motorcycle = require_motorcycle_ownership(motorrad_id)
-    ensure_motorcycle_mileage_is_current(motorcycle)
     if request.method == "POST":
         fill_motorcycle(motorcycle)
         uploaded_images = request.files.getlist("bilder") or [request.files.get("bild")]
         if storage_quota_exceeded(current_user.id, uploaded_images):
-            flash("Speicherlimit von 500 MB erreicht – Bilder wurden nicht gespeichert.", "danger")
+            flash(storage_limit_message("– Bilder wurden nicht gespeichert."), "danger")
         else:
             add_motorcycle_images(motorcycle, uploaded_images)
         db.session.commit()
@@ -772,6 +815,7 @@ def checklist_edit(checklist_id):
         if not checklist.is_template:
             abort(409)
         record = create_checklist_record_from_template(checklist)
+        refresh_motorcycle_mileage(checklist.motorcycle)
         db.session.commit()
         return redirect(url_for("main.checklist_edit", checklist_id=record.id))
 
@@ -809,7 +853,10 @@ def checklist_delete(checklist_id):
     checklist = db.get_or_404(ServiceChecklist, checklist_id)
     require_motorcycle_ownership(checklist.motorrad_id)
     motorrad_id = checklist.motorrad_id
+    motorcycle = checklist.motorcycle
     db.session.delete(checklist)
+    db.session.flush()
+    refresh_motorcycle_mileage(motorcycle)
     db.session.commit()
     next_url = safe_next_url(request.form.get("next"))
     return redirect(next_url or url_for("main.checklist_index", motorrad_id=motorrad_id))
@@ -871,7 +918,7 @@ def service_new(motorrad_id):
         db.session.flush()
         beleg_file = request.files.get("beleg")
         if storage_quota_exceeded(current_user.id, [beleg_file]):
-            flash("Speicherlimit von 500 MB erreicht – Beleg wurde nicht gespeichert.", "danger")
+            flash(storage_limit_message("– Beleg wurde nicht gespeichert."), "danger")
         else:
             receipt_path, original_name = save_upload(beleg_file, motorrad_id, "receipts")
             if receipt_path:
@@ -902,7 +949,7 @@ def service_edit(service_id):
         fill_service(service)
         beleg_file = request.files.get("beleg")
         if storage_quota_exceeded(current_user.id, [beleg_file]):
-            flash("Speicherlimit von 500 MB erreicht – Beleg wurde nicht gespeichert.", "danger")
+            flash(storage_limit_message("– Beleg wurde nicht gespeichert."), "danger")
         else:
             receipt_path, original_name = save_upload(beleg_file, service.motorrad_id, "receipts")
             if receipt_path:
@@ -1011,8 +1058,13 @@ def api_create_service():
     if not current_user.is_authenticated:
         abort(401)
 
-    data = request.get_json(force=True)
-    motorcycle = db.get_or_404(Motorcycle, data.get("motorrad_id"))
+    data = api_json_object()
+    if data is None:
+        return api_error("JSON-Objekt erwartet.")
+    motorrad_id = parse_int(data.get("motorrad_id"))
+    motorcycle = db.session.get(Motorcycle, motorrad_id) if motorrad_id else None
+    if not motorcycle:
+        return api_error("Motorrad nicht gefunden.", 404)
     if motorcycle.user_id != current_user.id:
         abort(403)
 
@@ -1037,45 +1089,86 @@ def api_create_service():
 
 @bp.route("/api/sync", methods=["POST"])
 def api_sync():
+    """Offline-Eintraege uebernehmen.
+
+    Die Antwort bestaetigt jeden Eintrag einzeln ueber seinen Index in der
+    gesendeten Liste ("accepted"/"rejected"), damit der Client nur wirklich
+    gespeicherte Eintraege aus seinem Offline-Speicher entfernt.
+    """
     if not current_user.is_authenticated:
         abort(401)
 
-    data = request.get_json(force=True)
-    create_sync_backup()
+    data = api_json_object()
+    if data is None:
+        return api_error("JSON-Objekt erwartet.")
     created = []
-    for item in data.get("services", []):
-        motorcycle = db.session.get(Motorcycle, item.get("motorrad_id"))
-        if not motorcycle or motorcycle.user_id != current_user.id:
+    checklist_services = []
+    accepted = {"services": [], "checklist_services": []}
+    rejected = {"services": [], "checklist_services": []}
+
+    def payload_list(key):
+        value = data.get(key, [])
+        return value if isinstance(value, list) else []
+
+    def owned_motorcycle(item):
+        motorrad_id = parse_int(item.get("motorrad_id"))
+        motorcycle = db.session.get(Motorcycle, motorrad_id) if motorrad_id else None
+        if motorcycle and motorcycle.user_id == current_user.id:
+            return motorcycle
+        return None
+
+    for index, item in enumerate(payload_list("services")):
+        motorcycle = owned_motorcycle(item) if isinstance(item, dict) else None
+        if not motorcycle:
+            rejected["services"].append(index)
             continue
-        service = ServiceEntry(
-            motorrad_id=motorcycle.id,
-            user_id=current_user.id,
-            titel=item.get("titel"),
-            datum=parse_date(item.get("datum")) or date.today(),
-            kilometerstand=parse_int(item.get("kilometerstand")),
-            beschreibung=item.get("beschreibung"),
-            kosten=parse_int(item.get("kosten")),
-            kategorie=item.get("kategorie") or "Sonstiges",
-            naechster_service_km=parse_int(item.get("naechster_service_km")),
-            naechster_service_datum=parse_date(item.get("naechster_service_datum")),
-        )
+        try:
+            service = ServiceEntry(
+                motorrad_id=motorcycle.id,
+                user_id=current_user.id,
+                titel=item.get("titel"),
+                datum=parse_date(item.get("datum")) or date.today(),
+                kilometerstand=parse_int(item.get("kilometerstand")),
+                beschreibung=item.get("beschreibung"),
+                kosten=parse_int(item.get("kosten")),
+                kategorie=item.get("kategorie") or "Sonstiges",
+                naechster_service_km=parse_int(item.get("naechster_service_km")),
+                naechster_service_datum=parse_date(item.get("naechster_service_datum")),
+            )
+        except InvalidDateError:
+            rejected["services"].append(index)
+            continue
         db.session.add(service)
         db.session.flush()
         refresh_motorcycle_mileage(motorcycle)
         created.append(serialize_service(service))
-    checklist_services = []
-    for item in data.get("checklist_services", []):
-        template = db.session.get(ServiceChecklist, item.get("checklist_id"))
-        motorcycle = db.session.get(Motorcycle, item.get("motorrad_id"))
-        if not template or not motorcycle or template.motorrad_id != motorcycle.id:
+        accepted["services"].append(index)
+
+    for index, item in enumerate(payload_list("checklist_services")):
+        motorcycle = owned_motorcycle(item) if isinstance(item, dict) else None
+        checklist_id = parse_int(item.get("checklist_id")) if isinstance(item, dict) else None
+        template = db.session.get(ServiceChecklist, checklist_id) if checklist_id else None
+        if not motorcycle or not template or template.motorrad_id != motorcycle.id:
+            rejected["checklist_services"].append(index)
             continue
-        if motorcycle.user_id != current_user.id:
+        try:
+            record = create_checklist_record_from_payload(template, item)
+        except InvalidDateError:
+            rejected["checklist_services"].append(index)
             continue
-        record = create_checklist_record_from_payload(template, item)
         refresh_motorcycle_mileage(motorcycle)
         checklist_services.append({"checklist_id": record.id})
+        accepted["checklist_services"].append(index)
+
     db.session.commit()
-    return jsonify({"created": created, "checklist_services": checklist_services})
+    return jsonify(
+        {
+            "created": created,
+            "checklist_services": checklist_services,
+            "accepted": accepted,
+            "rejected": rejected,
+        }
+    )
 
 
 def fill_motorcycle(motorcycle):
@@ -1128,37 +1221,49 @@ def unique_checklist_records(records):
 
 
 def refresh_motorcycle_mileage(motorcycle):
+    """Denormalisierten Kilometerstand nach jeder Aenderung an Services/Checklisten neu setzen."""
     motorcycle.kilometerstand = latest_service_mileage(motorcycle.id)
 
 
-def ensure_motorcycle_mileage_is_current(motorcycle):
-    latest_mileage = latest_service_mileage(motorcycle.id)
-    if motorcycle.kilometerstand != latest_mileage:
-        motorcycle.kilometerstand = latest_mileage
+def reconcile_all_motorcycle_mileages():
+    """Einmal beim Start alle Kilometerstaende neu ableiten (z. B. nach Logik-Aenderungen)."""
+    changed = 0
+    for motorcycle in Motorcycle.query.all():
+        latest = latest_service_mileage(motorcycle.id)
+        if motorcycle.kilometerstand != latest:
+            motorcycle.kilometerstand = latest
+            changed += 1
+    if changed:
         db.session.commit()
+    return changed
 
 
 def latest_service_mileage(motorrad_id):
-    candidates = []
-    services = (
+    """Juengster erfasster Kilometerstand aus Services und Checklisten-Datensaetzen.
+
+    Zaehlt nur echte km-Angaben; das Intervall einer Checkliste ist kein
+    Kilometerstand. Bei gleichem Datum gewinnt der spaeter angelegte Eintrag.
+    """
+    service = (
         ServiceEntry.query.filter_by(motorrad_id=motorrad_id)
         .filter(ServiceEntry.kilometerstand.isnot(None))
-        .all()
+        .order_by(ServiceEntry.datum.desc(), ServiceEntry.id.desc())
+        .first()
     )
-    for service in services:
-        candidates.append((service.datum or date.min, service.id, service.kilometerstand))
-
-    checklist_records = (
+    checklist_date = db.func.coalesce(ServiceChecklist.datum, db.func.date(ServiceChecklist.completed_at))
+    checklist = (
         ServiceChecklist.query.filter_by(motorrad_id=motorrad_id, is_template=False)
-        .all()
+        .filter(ServiceChecklist.kilometerstand.isnot(None))
+        .order_by(checklist_date.desc().nullslast(), ServiceChecklist.id.desc())
+        .first()
     )
-    for checklist in checklist_records:
-        mileage = checklist.kilometerstand or checklist.intervall_km
-        if not mileage:
-            continue
-        checklist_date = checklist.datum or (checklist.completed_at.date() if checklist.completed_at else date.min)
-        candidates.append((checklist_date, checklist.id, mileage))
 
+    candidates = []
+    if service:
+        candidates.append((service.datum or date.min, service.id, service.kilometerstand))
+    if checklist:
+        checklist_day = checklist.datum or (checklist.completed_at.date() if checklist.completed_at else date.min)
+        candidates.append((checklist_day, checklist.id, checklist.kilometerstand))
     if not candidates:
         return None
     return max(candidates, key=lambda item: (item[0], item[1]))[2]
@@ -1486,6 +1591,24 @@ def merge_technical_rows(rows):
     return merged.values()
 
 
+def strip_unit_suffix(value, unit):
+    """Entfernt eine (auch mehrfach) als eigenes Wort angehaengte Einheit.
+
+    Aeltere Versionen des Datenblatts haben Wert und Einheit in einem Feld
+    angezeigt, sodass beim Speichern "583 ccm" mit Einheit "ccm" entstand.
+    "5-Gang" bleibt bei Einheit "g" unveraendert, weil kein Leerzeichen davor steht.
+    """
+    suffix = (unit or "").strip().lower()
+    if not suffix:
+        return value
+    while value.lower().endswith(suffix):
+        head = value[: -len(suffix)]
+        if not head or not head[-1].isspace():
+            break
+        value = head.rstrip()
+    return value
+
+
 def save_technical_specs(motorcycle):
     rows = []
     names = request.form.getlist("name")
@@ -1497,13 +1620,15 @@ def save_technical_specs(motorcycle):
     for index, name in enumerate(names):
         name = name.strip()
         value = values[index].strip() if index < len(values) else ""
+        unit = units[index].strip() if index < len(units) else ""
+        value = strip_unit_suffix(value, unit)
         if not name or not value:
             continue
         rows.append(
             {
                 "name": name,
                 "wert": value,
-                "einheit": units[index].strip() if index < len(units) else "",
+                "einheit": unit,
                 "kategorie": categories[index].strip() if index < len(categories) else "Allgemein",
                 "quelle": sources[index].strip() if index < len(sources) else "",
             }
@@ -1554,8 +1679,11 @@ def create_checklist_record_from_payload(template, data):
     db.session.add(record)
     db.session.flush()
 
-    completed_ids = {str(item_id) for item_id in data.get("completed_item_ids", [])}
+    raw_completed = data.get("completed_item_ids", [])
+    completed_ids = {str(item_id) for item_id in raw_completed} if isinstance(raw_completed, list) else set()
     item_notes = data.get("item_notes", {})
+    if not isinstance(item_notes, dict):
+        item_notes = {}
     for item in template.items:
         db.session.add(
             ServiceChecklistItem(
@@ -1586,7 +1714,7 @@ def serialize_service(service):
 
 def get_backup_path():
     setting = db.session.get(AppSetting, "backup_path")
-    return setting.value if setting and setting.value else "/PFAD/ZUM/SICHERUNGSORDNER"
+    return setting.value if setting and setting.value else BACKUP_PATH_PLACEHOLDER
 
 
 def get_disk_usage():
@@ -1606,22 +1734,49 @@ def get_disk_usage():
     }
 
 
-def create_sync_backup():
+BACKUP_PATH_PLACEHOLDER = "/PFAD/ZUM/SICHERUNGSORDNER"
+
+
+class BackupError(RuntimeError):
+    """Backup konnte nicht erstellt werden (Konfiguration oder Dateisystem)."""
+
+
+def create_server_backup():
+    """Server-seitiges Backup in den konfigurierten Sicherungsordner (nur Admin).
+
+    Die SQLite-Datei wird ueber die Backup-API kopiert, damit auch bei laufenden
+    Schreibzugriffen eine konsistente Kopie entsteht; der Upload-Ordner wird
+    als Ganzes kopiert.
+    """
     backup_path = get_backup_path()
-    if not backup_path or backup_path == "/PFAD/ZUM/SICHERUNGSORDNER":
-        return None
+    if not backup_path or backup_path == BACKUP_PATH_PLACEHOLDER:
+        raise BackupError("Bitte zuerst einen Sicherungsort eintragen.")
 
     backup_root = Path(backup_path).expanduser()
     timestamp = utcnow().strftime("%Y%m%d_%H%M%S")
-    target = backup_root / f"motorrad_service_sync_{timestamp}"
-    target.mkdir(parents=True, exist_ok=True)
+    target = backup_root / f"motorrad_service_backup_{timestamp}"
+    try:
+        target.mkdir(parents=True, exist_ok=False)
+    except FileExistsError as error:
+        raise BackupError("Es läuft bereits ein Backup in dieser Sekunde. Bitte kurz warten.") from error
+    except OSError as error:
+        raise BackupError(f"Sicherungsort nicht beschreibbar: {backup_root}") from error
 
-    db_path = Path(current_app.instance_path) / "motorcycle_service.sqlite3"
-    if db_path.exists():
-        shutil.copy2(db_path, target / "motorcycle_service.sqlite3")
+    try:
+        if db.engine.dialect.name == "sqlite":
+            import sqlite3
 
-    uploads_path = Path(current_app.config["UPLOAD_FOLDER"])
-    if uploads_path.exists():
-        shutil.copytree(uploads_path, target / "uploads", dirs_exist_ok=True)
+            raw_connection = db.engine.raw_connection()
+            try:
+                with sqlite3.connect(target / "motorcycle_service.sqlite3") as destination:
+                    raw_connection.driver_connection.backup(destination)
+            finally:
+                raw_connection.close()
+
+        uploads_path = Path(current_app.config["UPLOAD_FOLDER"])
+        if uploads_path.exists():
+            shutil.copytree(uploads_path, target / "uploads", dirs_exist_ok=True)
+    except OSError as error:
+        raise BackupError(f"Backup fehlgeschlagen: {error}") from error
 
     return target

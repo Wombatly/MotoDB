@@ -1,34 +1,97 @@
-async function syncPendingServices() {
-  const services = await offlineDb.getServices();
-  const checklistServices = await offlineDb.getChecklistServices();
+function currentUserId() {
+  const value = document.body?.dataset.userId;
+  return value ? Number(value) : null;
+}
+
+// Eintraege ohne user_id stammen aus aelteren Versionen und werden dem
+// angemeldeten Nutzer zugerechnet, damit sie ueberhaupt synchronisierbar bleiben.
+function belongsToCurrentUser(entry, userId) {
+  return entry.user_id == null || entry.user_id === userId;
+}
+
+function csrfToken() {
+  return document.querySelector('meta[name="csrf-token"]')?.content || "";
+}
+
+async function syncPendingServices({ manual = false } = {}) {
+  const userId = currentUserId();
+  if (userId === null) return;
+
+  const allServices = await offlineDb.getServices();
+  const allChecklistServices = await offlineDb.getChecklistServices();
+  const pick = (entries) =>
+    entries.filter((entry) => belongsToCurrentUser(entry, userId) && (manual || !entry.rejected_at));
+  const services = pick(allServices);
+  const checklistServices = pick(allChecklistServices);
+
   if (!services.length && !checklistServices.length) {
-    showToast("Keine offenen Offline-Einträge.");
+    if (manual) {
+      const foreign = allServices.length + allChecklistServices.length;
+      showToast(
+        foreign
+          ? "Keine eigenen Offline-Einträge. Einträge anderer Konten bleiben gespeichert."
+          : "Keine offenen Offline-Einträge."
+      );
+    }
     return;
   }
 
   const response = await fetch("/api/sync", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-CSRFToken": document.querySelector('meta[name="csrf-token"]')?.content || "",
-    },
+    headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken() },
     body: JSON.stringify({ services, checklist_services: checklistServices }),
   });
 
   if (!response.ok) {
-    throw new Error("Sync fehlgeschlagen");
+    throw new Error(`Sync fehlgeschlagen (${response.status})`);
   }
 
-  await offlineDb.clearServices();
-  await offlineDb.clearChecklistServices();
-  showToast(`${services.length + checklistServices.length} Offline-Eintrag synchronisiert.`);
+  const result = await response.json();
+  const accepted = result.accepted || { services: [], checklist_services: [] };
+  const rejected = result.rejected || { services: [], checklist_services: [] };
+  const byIndex = (entries, indexes) => (indexes || []).map((index) => entries[index]).filter(Boolean);
+
+  const acceptedServices = byIndex(services, accepted.services);
+  const acceptedChecklists = byIndex(checklistServices, accepted.checklist_services);
+  const rejectedServices = byIndex(services, rejected.services);
+  const rejectedChecklists = byIndex(checklistServices, rejected.checklist_services);
+
+  await offlineDb.deleteIds(offlineDb.STORES.services, acceptedServices.map((entry) => entry.local_id));
+  await offlineDb.deleteIds(offlineDb.STORES.checklistServices, acceptedChecklists.map((entry) => entry.local_id));
+
+  const acceptedCount = acceptedServices.length + acceptedChecklists.length;
+  const rejectedCount = rejectedServices.length + rejectedChecklists.length;
+
+  if (rejectedCount) {
+    const discard =
+      manual &&
+      window.confirm(
+        `${rejectedCount} Offline-Eintrag/-Einträge wurden vom Server abgelehnt ` +
+          "(z. B. ungültige Angaben oder gelöschtes Motorrad). Sollen sie verworfen werden?"
+      );
+    if (discard) {
+      await offlineDb.deleteIds(offlineDb.STORES.services, rejectedServices.map((entry) => entry.local_id));
+      await offlineDb.deleteIds(offlineDb.STORES.checklistServices, rejectedChecklists.map((entry) => entry.local_id));
+    } else {
+      await offlineDb.markRejected(offlineDb.STORES.services, rejectedServices);
+      await offlineDb.markRejected(offlineDb.STORES.checklistServices, rejectedChecklists);
+    }
+  }
+
+  if (acceptedCount && rejectedCount) {
+    showToast(`${acceptedCount} Eintrag/Einträge synchronisiert, ${rejectedCount} abgelehnt.`);
+  } else if (acceptedCount) {
+    showToast(`${acceptedCount} Offline-Eintrag/-Einträge synchronisiert.`);
+  } else {
+    showToast(`${rejectedCount} Offline-Eintrag/-Einträge wurden vom Server abgelehnt.`);
+  }
 }
 
 document.getElementById("syncButton")?.addEventListener("click", async () => {
   try {
-    await syncPendingServices();
+    await syncPendingServices({ manual: true });
   } catch (error) {
-    showToast("Server nicht erreichbar. Sync später erneut starten.");
+    showToast("Sync nicht möglich. Bist du angemeldet und online?");
   }
 });
 
@@ -44,9 +107,11 @@ async function saveServiceFormOffline(form) {
   });
   const formData = new FormData(form);
   const data = Object.fromEntries(formData.entries());
-  data.motorrad_id = Number(form.dataset.motorradId);
-  data.created_offline_at = new Date().toISOString();
+  delete data.csrf_token;
   delete data.beleg;
+  data.motorrad_id = Number(form.dataset.motorradId);
+  data.user_id = currentUserId();
+  data.created_offline_at = new Date().toISOString();
 
   const serviceType = data.service_art || "free";
   if (serviceType.startsWith("checklist:")) {

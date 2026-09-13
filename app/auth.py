@@ -1,4 +1,6 @@
+import ipaddress
 import json
+import re
 import shutil
 import zipfile
 from datetime import datetime
@@ -23,6 +25,19 @@ AUTH_RATE_LIMIT_WINDOW_SECONDS = 15 * 60
 LOGIN_MAX_FAILURES = 5
 REGISTER_MAX_POSTS = 10
 
+# Bewusst einfach: genau ein "@", kein Whitespace, Domain mit Punkt.
+EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+MAX_EMAIL_LENGTH = 120  # entspricht User.email
+MAX_USERNAME_LENGTH = 80  # entspricht User.username
+
+
+def normalize_email(value):
+    """E-Mail fuer Speicherung/Vergleich vereinheitlichen; None bei ungueltigem Format."""
+    email = (value or "").strip().lower()
+    if not email or len(email) > MAX_EMAIL_LENGTH or not EMAIL_PATTERN.match(email):
+        return None
+    return email
+
 
 def admin_required(f):
     @wraps(f)
@@ -38,8 +53,38 @@ def client_rate_limit_id():
     return request.remote_addr or "unknown"
 
 
+def is_loopback_address(value):
+    try:
+        return ipaddress.ip_address(value).is_loopback
+    except ValueError:
+        return False
+
+
+def ip_rate_limit_usable():
+    """Ob remote_addr einen einzelnen Client identifiziert.
+
+    Hinter einem Reverse Proxy ohne MOTODB_TRUST_PROXY_HEADERS sehen alle
+    Requests wie 127.0.0.1 aus. Ein IP-basiertes Limit wuerde dann alle
+    Nutzer gemeinsam aussperren, sobald irgendjemand das Limit erreicht.
+    """
+    if current_app.config.get("MOTODB_TRUST_PROXY_HEADERS"):
+        return True
+    return not is_loopback_address(request.remote_addr or "")
+
+
 def auth_rate_limit_key(scope, identifier=""):
     return f"{scope}:{client_rate_limit_id()}:{identifier.strip().lower()}"
+
+
+def login_rate_limit_keys(email):
+    keys = [auth_rate_limit_key("login-email", email)]
+    if ip_rate_limit_usable():
+        keys.insert(0, auth_rate_limit_key("login-ip"))
+    return keys
+
+
+def register_rate_limit_keys():
+    return [auth_rate_limit_key("register")] if ip_rate_limit_usable() else []
 
 
 def recent_auth_attempts(key, window_seconds=AUTH_RATE_LIMIT_WINDOW_SECONDS):
@@ -112,19 +157,33 @@ def register():
         abort(404)
 
     if request.method == 'POST':
-        rate_limit_keys = [auth_rate_limit_key("register")]
+        rate_limit_keys = register_rate_limit_keys()
         if is_auth_rate_limited(rate_limit_keys, REGISTER_MAX_POSTS):
             flash('Zu viele Registrierungsversuche. Bitte warte kurz und versuche es erneut.', 'danger')
             return redirect(url_for('auth.register'))
         record_auth_attempt(rate_limit_keys)
 
         username = request.form.get('username', '').strip()
-        email = request.form.get('email', '').strip()
+        raw_email = request.form.get('email', '').strip()
         password = request.form.get('password', '')
         password_confirm = request.form.get('password_confirm', '')
+        consent = request.form.get('consent') == 'on'
 
-        if not all([username, email, password, password_confirm]):
+        if not all([username, raw_email, password, password_confirm]):
             flash('Alle Felder sind erforderlich.', 'danger')
+            return redirect(url_for('auth.register'))
+
+        if len(username) > MAX_USERNAME_LENGTH:
+            flash(f'Der Benutzername darf höchstens {MAX_USERNAME_LENGTH} Zeichen lang sein.', 'danger')
+            return redirect(url_for('auth.register'))
+
+        email = normalize_email(raw_email)
+        if not email:
+            flash('Bitte gib eine gültige E-Mail-Adresse ein.', 'danger')
+            return redirect(url_for('auth.register'))
+
+        if not consent:
+            flash('Bitte bestätige die Datenschutzhinweise.', 'danger')
             return redirect(url_for('auth.register'))
 
         if len(password) < 8:
@@ -139,11 +198,11 @@ def register():
             flash('Benutzername existiert bereits.', 'danger')
             return redirect(url_for('auth.register'))
 
-        if User.query.filter_by(email=email).first():
+        if User.query.filter(db.func.lower(User.email) == email).first():
             flash('Email existiert bereits.', 'danger')
             return redirect(url_for('auth.register'))
 
-        user = User(username=username, email=email)
+        user = User(username=username, email=email, consent_accepted_at=utcnow())
         user.set_password(password)
         db.session.add(user)
         db.session.commit()
@@ -160,12 +219,9 @@ def login():
         return render_template('auth/login.html', https_required=True), 400
 
     if request.method == 'POST':
-        email = request.form.get('email', '').strip()
+        email = request.form.get('email', '').strip().lower()
         password = request.form.get('password', '')
-        rate_limit_keys = [
-            auth_rate_limit_key("login-ip"),
-            auth_rate_limit_key("login-email", email),
-        ]
+        rate_limit_keys = login_rate_limit_keys(email)
 
         if is_auth_rate_limited(rate_limit_keys, LOGIN_MAX_FAILURES):
             flash('Zu viele Anmeldeversuche. Bitte warte kurz und versuche es erneut.', 'danger')
@@ -176,7 +232,7 @@ def login():
             flash('Email und Passwort erforderlich.', 'danger')
             return redirect(url_for('auth.login'))
 
-        user = User.query.filter_by(email=email).first()
+        user = User.query.filter(db.func.lower(User.email) == email).first()
 
         if not user or not user.check_password(password):
             record_auth_attempt(rate_limit_keys)

@@ -1,186 +1,166 @@
 # MotoDB Audit-Report
 
-Datum: 2026-06-07
-Umfang: Security, Performance/Skalierung, Code-Qualität und Wartbarkeit.
-Vorheriger Report: 2026-05-25 (dieser Report ersetzt ihn).
+Datum: 2026-09-13
+Umfang: Security, Korrektheit, Konsistenz (Code ↔ Doku ↔ Betrieb) und
+Veröffentlichungsreife.
+Vorheriger Report: 2026-06-07 (dieser Report ersetzt ihn).
 
 ## Kurzfazit
 
-Seit dem letzten Audit wurden die wichtigsten Punkte behoben: Dependencies sind
-aktuell und laut OSV ohne bekannte Schwachstellen, die Upload-Verarbeitung wurde
-deutlich gehärtet (echte Bildformat-Prüfung, PDF-Limits), App-seitiges
-Rate-Limiting ist vorhanden, und der offene Referrer-Redirect ist beseitigt.
+Die Punkte des Juni-Audits zu Dependencies, Upload-Härtung und Pfad-Traversal
+sind weiterhin sauber. Dieses Audit hat den kompletten Code (Backend,
+Templates, JS, Service Worker, Deploy-Dateien, Git-Historie) durchgesehen und
+verdächtige Stellen mit einem Probe-Skript gegen den Test-Client verifiziert.
 
-Die verbleibenden Punkte sind überwiegend **niedrige Risiken** und
-**Performance-/Wartbarkeitsthemen**, die für den aktuellen Privatbetrieb (wenige
-Nutzer, Zugriff über LAN/Tailscale) unkritisch sind, aber bei wachsender Nutzung
-oder öffentlicher Exposition angegangen werden sollten.
+Ergebnis: **elf Befunde wurden in diesem Audit behoben** (Abschnitt „Behoben“),
+darunter zwei Betriebsrisiken (Login-Sperre für alle Nutzer; Vollbackup pro
+Sekunde durch jeden Nutzer auslösbar) und mehrere 500er durch ungeprüfte
+Eingaben. Verbleibend sind Doku-Inkonsistenzen, interne Daten im Repo und
+Punkte, die für eine Veröffentlichung noch fehlen (Lizenz, CI, non-root
+Container).
 
 ## Verifikation
 
-- `python -m unittest tests.test_security`: **17 Tests OK** (nach Fix eines durch UI-Änderung veralteten Tests, siehe unten).
-- OSV-Abfrage am 2026-06-07 über `https://api.osv.dev/v1/querybatch` für alle Pakete aus `requirements.txt`: **keine Treffer**.
-- Installierte Versionen (Laufzeit-Container): Flask 3.1.3, Werkzeug 3.1.8, Pillow 12.2.0, pypdf 6.12.2, gunicorn 22.0.0, Flask-WTF 1.2.1, Flask-Login 0.6.3, Flask-SQLAlchemy 3.1.1.
-- Quellcode-Durchsicht von `app/__init__.py`, `app/routes.py`, `app/auth.py`, `app/utils.py`, `app/models.py`.
+- `python -m unittest tests.test_security tests.test_input_validation`
+  im Laufzeit-Image: **32 Tests OK** (17 bestehende + 15 neue).
+- Smoke-Test über 33 GET-Routen nach den Änderungen: alle 200.
+- Sync-Logik (`sync.js`) mit gemockter IndexedDB/fetch in Node geprüft.
+- Git-Historie: keine `.env`, keine SQLite-Datei, keine Secrets committet.
+- Laufender Container (`motorrad-service-http`) am 2026-09-13:
+  `MOTODB_PUBLIC_HOSTING=false`, `MOTODB_TRUST_PROXY_HEADERS=false`,
+  `MOTODB_ALLOW_REGISTRATION=true`, `MOTODB_MAX_STORAGE_MB=200`.
 
-## Seit dem letzten Audit behoben
+## In diesem Audit behoben
 
-- **Verwundbare Dependencies** → aktualisiert; OSV meldet keine bekannten Schwachstellen mehr (vorher Flask/Werkzeug/Pillow/pypdf betroffen).
-- **Upload-Typprüfung nur per Endung** → `save_upload` nutzt jetzt `secure_filename`, eine Endungs-Allowlist je Ordner und temporäre Dateien; Bilder werden mit `Image.open(..., formats=ALLOWED_IMAGE_FORMATS)` + `image.verify()` echt validiert (`app/utils.py:501`, `app/utils.py:554`).
-- **Bild unter falscher Endung als JPEG gespeichert** → Bilder werden nun konsequent als `.jpg` gespeichert (`stored_extension`, `app/utils.py:518`).
-- **PDF-Parsing unbegrenzt** → Limits aktiv: max. 2 MB Datei, 20 Seiten, 100 000 Zeichen, Magic-Header- und Encrypted-Prüfung (`app/utils.py:24`, `app/utils.py:375`).
-- **Login-Rate-Limit nur in Nginx** → App-seitiges Rate-Limiting pro IP/E-Mail (`app/auth.py:19`, `app/auth.py:54`).
-- **Offene Referrer-Weiterleitung** → `backup_path_update` leitet fest auf `main.settings` (`app/routes.py:253`).
-- **Pfad-Traversal bei Uploads** → mehrschichtig abgesichert: Ownership-Check, `resolve_upload_path` (`relative_to(root)`) und `send_from_directory` (`app/routes.py:798`, `app/routes.py:1035`).
+### Hoch
 
-## Security (offen)
+1. **Login-Sperre traf alle Nutzer gleichzeitig.** Hinter Nginx ohne
+   `MOTODB_TRUST_PROXY_HEADERS` ist `remote_addr` für alle `127.0.0.1`; fünf
+   Fehlversuche von irgendjemandem sperrten den Login für alle 15 Minuten.
+   Fix: IP-Key wird nur genutzt, wenn Proxy-Header vertraut werden oder die
+   Adresse keine Loopback-Adresse ist; sonst nur das Limit pro E-Mail. Beim
+   Start erscheint eine Warnung im Log (`app/auth.py`, `app/__init__.py`).
+   **Betrieb:** zusätzlich `MOTODB_TRUST_PROXY_HEADERS=true` in `.env.http`
+   setzen (siehe „Offene Punkte → Betrieb“).
+2. **Jeder Nutzer konnte per `POST /api/sync` ein Vollbackup (DB + alle
+   Uploads) pro Sekunde auslösen** – Disk-Fill-DoS, dazu inkonsistente Kopie
+   der Live-SQLite per `shutil.copy2`. Fix: Sync erstellt kein Backup mehr;
+   Admins haben „Backup jetzt erstellen“ (`POST /settings/backup`) mit
+   SQLite-Backup-API (`create_server_backup`, `app/routes.py`).
+3. **500er durch ungeprüfte Eingaben.** `parse_date` warf `ValueError`
+   (Formulare und JSON-API), `get_json(force=True)` akzeptierte Nicht-Dicts,
+   fehlende `motorrad_id` crashte. Fix: `InvalidDateError` + Blueprint-
+   Errorhandler (Formular: Flash + Redirect zurück, API: JSON 400),
+   `get_json(silent=True)` mit Typprüfung, `parse_int` für IDs; `/api/sync`
+   überspringt ungültige Einzel-Einträge und meldet sie (`rejected`).
 
-### Niedrig: Rate-Limiting ist In-Memory und pro Worker
+### Mittel
 
-Fundstelle: `app/auth.py:19` (`AUTH_ATTEMPTS = {}`)
+4. **Datenblatt-Autosave hängte die Einheit bei jedem Speichern erneut an**
+   („583 ccm ccm“). Fix: Eingabefeld enthält nur den Wert, Einheit steht als
+   Text daneben; `strip_unit_suffix` bereinigt Alt-Eingaben; einmalige
+   Bereinigung vorhandener Daten in `ensure_schema_updates`.
+5. **Checklisten-Intervall wurde als Kilometerstand übernommen** (Motorrad mit
+   500 km → „10.000 km Service“ ohne km-Angabe → 10.000 km). Fix: nur echte
+   km-Angaben zählen; `latest_service_mileage` per SQL (`LIMIT 1`) statt
+   Python-Maximum; kein `commit()` mehr im GET; Abgleich aller Kilometerstände
+   einmal beim Start (`reconcile_all_motorcycle_mileages`); Nachziehen auch
+   beim Ausfüllen über `/checklisten/<id>` und beim Löschen von Datensätzen.
+6. **Offline-Einträge gingen bei Nutzerwechsel im selben Browser verloren.**
+   Fix: Einträge tragen die Nutzer-ID, Sync sendet nur eigene Einträge; Server
+   bestätigt pro Eintrag (`accepted`/`rejected` als Indizes), Client löscht nur
+   Bestätigtes; Abgelehntes bleibt markiert, Auto-Sync überspringt es, manueller
+   Sync fragt vor dem Verwerfen (`sync.js`, `indexeddb.js`, `api_sync`).
+7. **Google Fonts wurden von der eigenen CSP blockiert** (Logbuch-Theme fiel
+   still auf Systemschrift zurück; bei Freigabe DSGVO-relevanter externer
+   Request). Fix: IBM Plex Sans/Mono als Latin1-WOFF2 selbst gehostet
+   (`app/static/fonts/`, OFL-Lizenz beiliegend, 156 KB), `@font-face` in
+   `app.css`, MIME-Typen registriert, Service-Worker-Precache ergänzt.
+8. **Speicherlimit-Meldung hardcoded „500 MB“**, Betrieb hat 200 MB. Fix:
+   `storage_limit_message` leitet den Wert aus `MAX_USER_STORAGE_BYTES` ab.
+9. **Registrierung ohne E-Mail-Validierung und ohne Einwilligung.** Fix:
+   Formatprüfung + Normalisierung (Kleinschreibung, Längen wie DB-Spalten),
+   Pflicht-Checkbox für die Datenschutzhinweise, `consent_accepted_at` wird
+   gesetzt; Login und Duplikatprüfung sind jetzt case-insensitiv.
+10. **`safe_next_url` ließ `/\evil.example` durch** (Browser normalisieren zu
+    `//evil.example`). Fix: `startswith(("//", "/\\"))`.
+11. **Schema-Migration lief in jedem Gunicorn-Worker parallel** (Race bei
+    `ALTER TABLE`). Fix: `fcntl.flock`-Sperre (`startup_lock`) um
+    `create_all` + Migrationen + Abgleich.
 
-Das Rate-Limit liegt in einem Prozess-Dictionary. Bei `gunicorn --workers 2` hat
-jeder Worker einen eigenen Zähler (effektiv ~2× Limit), und Neustarts setzen die
-Zähler zurück. Für wenige Nutzer ausreichend; bei härterem Brute-Force-Schutz
-einen gemeinsamen Speicher (z. B. Redis) oder `flask-limiter` nutzen.
+Doku/Hilfe wurden für die geänderten Verhalten (Sync, Backup, API-Antwort)
+angepasst; Service-Worker-Cache auf `motodb-v48`.
 
-### Niedrig: ProxyFix dauerhaft aktiv
+## Offene Punkte
 
-Fundstelle: `compose.yaml`, `app/__init__.py:71`
+### Betrieb (sofort, außerhalb des Repos)
 
-`MOTODB_TRUST_PROXY_HEADERS` ist aktiv, damit Flask hinter Nginx das echte Schema/
-die echte IP sieht. Das ist nur sicher, solange der App-Port **nicht** direkt
-öffentlich erreichbar ist (aktuell `127.0.0.1:5001`). Als Deployment-Annahme
-festhalten: App-Port nie direkt exponieren, wenn Proxy-Header vertraut werden.
+- **`MOTODB_TRUST_PROXY_HEADERS=true` in `/srv/motorrad-service/.env.http`
+  setzen** und den Container per `apply-config.sh` neu starten. Ohne diesen
+  Wert gilt nur das E-Mail-basierte Login-Limit (Nginx limitiert `/login`
+  zusätzlich mit 10 r/min).
+- `MOTODB_ALLOW_REGISTRATION=true` im LAN/Tailscale-Betrieb: jeder im Netz
+  kann sich registrieren und 200 MB belegen. Bewusst entscheiden.
+- `compose.yaml`/`deploy/update-on-pi.sh` beschreiben einen Compose-Betrieb,
+  real läuft `docker run` + `.env.http` (Audit-Punkt aus dem Juni, weiterhin
+  offen). Eine der beiden Varianten als verbindlich festlegen.
 
-### Niedrig: `request.get_json(force=True)` ignoriert Content-Type
+### Security (niedrig)
 
-Fundstelle: `app/routes.py:862`, `app/routes.py:891`
+- Rate-Limit ist In-Memory und pro Worker (Juni-Punkt, unverändert).
+- Kein Sitzungs-Timeout (bewusst verschoben, unverändert).
+- Dokument-Kategorie wird nicht gegen `DOCUMENT_CATEGORIES` validiert;
+  String-Längen werden von SQLite nicht erzwungen. Unkritisch.
+- Der Sicherungsort ist ein frei wählbarer Serverpfad (nur Admin). Für
+  Public Hosting auf ein festes Verzeichnis unterhalb `/data` einschränken.
 
-`force=True` parst den Body auch ohne `application/json`. CSRF greift weiterhin
-(die Endpunkte sind nicht von CSRFProtect ausgenommen, `sync.js` sendet den
-`X-CSRFToken`-Header), daher kein CSRF-Loch. Sauberer wäre `silent=True` mit
-expliziter Fehlerbehandlung statt `force`.
+### Inkonsistenzen und toter Code
 
-### Hinweis: Laufzeit-Deployment ohne Public-Hosting-Modus
+- `Motorcycle.aktiv`: Model und `fill_motorcycle` unterstützen es, kein
+  Formular bietet es an; README bewirbt „Aktive und verkaufte Motorräder
+  verwalten“. Entweder Feld ins Formular oder aus README streichen.
+- `index()` unterstützt `q`/`sort` ohne UI; `import_text`
+  (Freitext/JSON-Import technischer Daten) wird verarbeitet, kommt in keinem
+  Template vor, ist aber im README dokumentiert.
+- `AuditLog` ohne Schreibstelle, `split_lines` ungenutzt, Legacy-Route
+  `/motorrad/<id>/bild-loeschen` neben der Galerie-Route (Juni-Punkte).
+- `disk_usage` wird per Context-Processor auf jeder Seite berechnet und in
+  `admin_users` nochmals; genutzt nur in `admin/users.html`.
+- Hilfetext „Motorrad anlegen“ nennt ein Kilometerstand-Feld, das Formular hat
+  keines (Kilometerstand wird aus Services/Checklisten abgeleitet).
+- `parse_int` streicht alle Nicht-Ziffern: `1.500,50` → `150050`. Die UI
+  normalisiert sichtbar beim Verlassen des Felds, die API nicht. Beträge sind
+  bewusst ganze Euro – in der Hilfe erwähnen.
+- Service Worker: Fallback `caches.match("/")` kann nie treffen, da `/` nicht
+  gecacht wird; nach Offline-Speichern wird auf eine nicht gecachte Seite
+  umgeleitet. Manifest hat `icons: []` → PWA nicht installierbar.
 
-Der aktiv laufende Container nutzt `MOTODB_PUBLIC_HOSTING=false`, damit Login auch
-über HTTP (LAN/Tailscale) funktioniert. Das ist für den privaten Zugriff über das
-verschlüsselte Tailscale-Netz vertretbar. Bei echter öffentlicher Exposition
-muss `MOTODB_PUBLIC_HOSTING=true` mit HTTPS gesetzt werden (erzwingt Secure-Cookies,
-HSTS, CSRF-über-HTTP-Block). `compose.yaml`/`.env` und der Laufzeit-Container
-sollten konsolidiert werden, damit beide denselben Modus beschreiben.
+### Veröffentlichung
 
-### Offen: Kein Sitzungs-Timeout / kein automatisches Abmelden (für öffentliche Nutzung)
-
-Fundstelle: `app/__init__.py` (Session-Konfiguration), `app/auth.py` (`login_user`)
-
-Sitzungen laufen aktuell nur bis zum Schließen des Browsers (Session-Cookie ohne
-`PERMANENT_SESSION_LIFETIME`/Idle-Timeout). Manche Browser behalten Session-Cookies
-über Neustarts hinweg ("Tabs wiederherstellen"), wodurch die Anmeldung lange gültig
-bleiben kann.
-
-Umgesetzt ist bereits: angemeldete Seiten werden mit `Cache-Control: no-store`
-ausgeliefert (`app/__init__.py`, `after_request`), sodass der Zurück-Button keine
-zwischengespeicherte angemeldete Seite zeigt. Das verhindert aber **kein** echtes
-Abmelden – die Sitzung bleibt gültig.
-
-Empfehlung für ein öffentliches / auf geteilten Geräten genutztes Deployment:
-**automatisches Abmelden nach Inaktivität** (z. B. 5–15 Minuten) ergänzen, z. B. über
-`PERMANENT_SESSION_LIFETIME` mit `session.permanent = True` und sliding Refresh, oder
-clientseitig per Inaktivitäts-Timer + Logout-Beacon. Optional zusätzlich die
-Sitzungsdauer serverseitig begrenzen. **Status: bewusst auf später verschoben.**
-
-## Performance und Skalierung
-
-### `latest_service_mileage` lädt alle Kandidaten in Python
-
-Fundstelle: `app/routes.py:1005`
-
-Lädt alle Service- und Checklisten-Datensätze und bildet das Maximum in Python.
-Wird bei Detail-/Edit-Aufrufen und nach Mutationen genutzt. Zudem schreibt
-`ensure_motorcycle_mileage_is_current` bei Abweichung per `commit()` **während eines
-GET-Requests** (`app/routes.py:998`). Empfehlung: per SQL `ORDER BY ... LIMIT 1`
-oder denormalisierten Kilometerstand gezielt beim Schreiben aktualisieren.
-
-### Detailseite lädt komplette Service-Historie
-
-Fundstelle: `app/routes.py:457`
-
-Alle Services und technischen Daten werden geladen, Kostenaggregation passiert in
-Python. Bei langer Historie wächst die Seite. Empfehlung: paginieren/begrenzen,
-Aggregation per SQL.
-
-### User-Export: N+1-Abfragen und ZIP komplett im RAM
-
-Fundstelle: `app/auth.py:234`
-
-Pro Motorrad werden Bilder, Services, Dokumente, Specs und Checklisten separat
-abgefragt; das ZIP entsteht vollständig in `BytesIO`. Empfehlung: Beziehungen
-eager-loaden (`selectinload`) und ZIP bei großen Exports in eine temporäre Datei
-streamen.
-
-### Sync-Backup kopiert vor jedem Sync den gesamten Upload-Baum
-
-Fundstelle: `app/routes.py:1427` (`create_sync_backup`)
-
-Bei gesetztem Backup-Pfad werden SQLite-Datei und kompletter Upload-Ordner vor
-jedem Sync kopiert (blockierend im Request). Bei vielen Bildern/PDFs teuer und
-speicherintensiv. Empfehlung: entkoppeln, inkrementell oder nach Zeit/Größe drosseln.
-
-### Disk-Usage wird global in alle Templates injiziert
-
-Fundstelle: `app/routes.py:144` (`inject_settings`)
-
-`get_disk_usage()` (ruft `shutil.disk_usage`) läuft per Context-Processor auf
-**jeder** Seite, obwohl es nur in Admin-/Settings-Ansichten angezeigt wird.
-Empfehlung: nur dort berechnen, wo es gebraucht wird.
-
-## Code-Qualität und Wartbarkeit
-
-### Test war nicht mehr synchron mit der UI (in diesem Audit behoben)
-
-`tests/test_security.py:245` prüfte auf den Text „Garage herunterladen", der beim
-UI-Umbau (Karte „Daten auf mein Gerät sichern") entfernt wurde. Der Test wurde auf
-die stabile Export-Route `"/user/export"` umgestellt; alle 17 Tests sind grün.
-
-### Tests werden nicht ins Docker-Image kopiert
-
-Fundstelle: `Dockerfile` (kopiert nur `app` und `run.py`)
-
-Dadurch lassen sich Tests nicht direkt im Build/Container ausführen. Für CI/lokale
-Verifikation `tests/` einbeziehen oder einen separaten Test-Build vorsehen.
-
-### Ungenutzter Code
-
-- `AuditLog`-Modell ist definiert, hat aber keine Schreibstelle (`app/models.py`).
-- `split_lines` wird nirgends aufgerufen (`app/routes.py:1099`).
-- Legacy-Route `/motorrad/<id>/bild-loeschen` existiert neben der Galerie-Route `/motorrad/<id>/bilder/<image_id>/loeschen` (`app/routes.py:517` vs. `:537`).
-
-Empfehlung: entfernen oder bewusst als Kompatibilität dokumentieren.
-
-### SQLAlchemy Legacy-API
-
-`Model.query.get(...)` (Legacy) wird noch verwendet: 2× in `app/__init__.py`,
-6× in `app/routes.py`. Empfehlung: schrittweise auf `db.session.get(Model, id)`
-umstellen.
-
-### `routes.py` ist sehr groß
-
-Fundstelle: `app/routes.py` (~1445 Zeilen) mischt Views, API, Import, Backup und
-Upload-Helfer. Empfehlung: in Module aufteilen (`views/`, `services/uploads.py`,
-`services/backups.py`, `services/mileage.py`).
-
-### Manuelle Schema-Migrationen
-
-`ensure_schema_updates` führt Raw-SQL-Migrationen beim Start aus
-(`app/__init__.py`). Pragmatisch für SQLite, aber bei mehr Änderungen schwer
-rückrollbar. Ab der nächsten größeren Änderung Alembic/Flask-Migrate erwägen.
+- **Interne Daten im Repo:** `run.py` druckt `192.168.178.59`; `README.md`
+  und `deploy/README_RASPI.md` enthalten `gregor@192.168.178.102` und den
+  Hostnamen. Vor einem Public-Release durch Platzhalter ersetzen.
+- **README veraltet:** requirements-Block (Flask-WTF 1.2.1 / pypdf 6.12.2 /
+  fpdf2 2.8.5 / gunicorn 22 vs. real 1.3.0 / 6.13.2 / 2.8.7 / 26.0.0),
+  Farbschema-Liste ohne „Werkstatt-Logbuch“, FAB-Beschreibung (legt Motorrad
+  an, nicht Service), „Dokumente unter Einstellungen → Datenblatt“,
+  Datenblatt-CSV mit 5 Spalten vs. 4 in der echten Vorlage, Config-Tabelle
+  ohne `MOTODB_MAX_STORAGE_MB` / `MOTODB_CONTROLLER_NAME` /
+  `MOTODB_CONTROLLER_CONTACT`, Projektstruktur ohne `help_content.py` /
+  `timeutils.py`, Benutzerverwaltung liegt unter „Konto“, nicht „Gefahrenzone“.
+- **Fehlt:** `LICENSE`, CI (Tests laufen nur manuell; Dockerfile kopiert
+  `tests/` nicht), `HEALTHCHECK` und non-root `USER` im Dockerfile.
+- `run.py` startet mit `debug=True` (Werkzeug-Debugger = Remote-Code-Execution,
+  falls jemand das produktiv nutzt). Aus `FLASK_DEBUG` lesen.
+- `AUDIT_REPORT.md` beschreibt das Tailscale-Setup; für ein öffentliches Repo
+  ggf. nach `docs/` verschieben oder kürzen.
 
 ## Empfohlene Reihenfolge
 
-1. Verbleibende Performance-Hotspots: `latest_service_mileage` (SQL statt Python, kein Commit im GET), Disk-Usage nur in Admin-Views.
-2. Ungenutzten Code bereinigen (`AuditLog`, `split_lines`, Legacy-Bildroute).
-3. `compose.yaml`/`.env` mit dem realen Laufzeit-Modus konsolidieren und Deployment-Annahmen dokumentieren.
-4. Sync-Backup vom Request entkoppeln/drosseln; User-Export eager-loaden/streamen.
-5. Schrittweise `db.session.get(...)` und ggf. versionierte Migrationen einführen.
+1. `.env.http` anpassen und Container neu bauen/starten (die Fixes aus diesem
+   Audit sind erst nach `docker build` + `apply-config.sh` aktiv).
+2. README-Inkonsistenzen und interne IPs/Namen bereinigen; `LICENSE` ergänzen.
+3. Toten Code entfernen (`aktiv`, `import_text`, `AuditLog`, `split_lines`,
+   Legacy-Bildroute, doppelte `disk_usage`).
+4. Dockerfile: non-root User, `HEALTHCHECK`, Tests im Build ausführbar; CI.
+5. PWA-Manifest-Icons und Service-Worker-Fallback.

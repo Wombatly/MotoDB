@@ -1,5 +1,8 @@
+from contextlib import contextmanager
 from datetime import datetime
 from app.timeutils import utcnow
+import fcntl
+import mimetypes
 import os
 from pathlib import Path
 
@@ -12,6 +15,12 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 
 db = SQLAlchemy()
 csrf = CSRFProtect()
+
+# Schlanke Container-Images haben keine /etc/mime.types; ohne diese Eintraege
+# wuerden die selbst gehosteten Fonts als application/octet-stream ausgeliefert.
+mimetypes.add_type("font/woff2", ".woff2")
+mimetypes.add_type("font/woff", ".woff")
+mimetypes.add_type("application/manifest+json", ".webmanifest")
 
 DEFAULT_SECRET_KEY = "dev-change-me"
 DEFAULT_ADMIN_EMAIL = "admin@localhost"
@@ -69,8 +78,15 @@ def create_app():
     Path(app.instance_path).mkdir(parents=True, exist_ok=True)
     app.config["UPLOAD_FOLDER"].mkdir(parents=True, exist_ok=True)
 
-    if env_bool("MOTODB_TRUST_PROXY_HEADERS"):
+    app.config["MOTODB_TRUST_PROXY_HEADERS"] = env_bool("MOTODB_TRUST_PROXY_HEADERS")
+    if app.config["MOTODB_TRUST_PROXY_HEADERS"]:
         app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+    else:
+        app.logger.warning(
+            "MOTODB_TRUST_PROXY_HEADERS ist aus. Hinter einem Reverse Proxy sehen alle "
+            "Requests wie 127.0.0.1 aus; das IP-basierte Login-Rate-Limit wird dann "
+            "deaktiviert und nur pro E-Mail limitiert."
+        )
 
     db.init_app(app)
     csrf.init_app(app)
@@ -124,13 +140,32 @@ def create_app():
     app.register_blueprint(bp)
     app.register_blueprint(auth_bp)
 
-    with app.app_context():
+    with app.app_context(), startup_lock(app.instance_path):
         db.create_all()
         ensure_admin(public_hosting)
         ensure_schema_updates()
         ensure_default_settings()
+        from app.routes import reconcile_all_motorcycle_mileages
+        reconcile_all_motorcycle_mileages()
 
     return app
+
+
+@contextmanager
+def startup_lock(instance_path):
+    """Serialisiert Schema-Anlage und Migrationen ueber Prozessgrenzen hinweg.
+
+    Gunicorn startet mehrere Worker, die alle create_app() ausfuehren. Ohne
+    Sperre koennen zwei Worker gleichzeitig "ALTER TABLE" auf dieselbe SQLite-
+    Datei absetzen; der zweite scheitert dann mit "duplicate column".
+    """
+    lock_path = Path(instance_path) / ".motodb-startup.lock"
+    with open(lock_path, "w") as lock_file:
+        fcntl.flock(lock_file, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(lock_file, fcntl.LOCK_UN)
 
 
 def security_policy():
@@ -247,6 +282,26 @@ def ensure_schema_updates():
                 )
                 """
             )
+
+        # Einmalige Bereinigung: fruehere Datenblatt-Autosaves haben die Einheit
+        # an den Wert angehaengt ("583 ccm" / "583 ccm ccm" bei Einheit "ccm").
+        from app.routes import strip_unit_suffix
+
+        polluted = connection.exec_driver_sql(
+            """
+            SELECT id, wert, einheit FROM technical_spec
+            WHERE einheit IS NOT NULL AND einheit != ''
+              AND wert IS NOT NULL
+              AND LOWER(wert) LIKE '% ' || LOWER(einheit)
+            """
+        ).all()
+        for spec_id, wert, einheit in polluted:
+            cleaned = strip_unit_suffix(wert, einheit)
+            if cleaned != wert:
+                connection.exec_driver_sql(
+                    "UPDATE technical_spec SET wert = :wert WHERE id = :id",
+                    {"wert": cleaned, "id": spec_id},
+                )
 
         connection.exec_driver_sql(
             """

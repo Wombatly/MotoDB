@@ -144,10 +144,17 @@ SERVICE_CHECKLIST_PRESETS = {
 }
 
 
+class InvalidDateError(ValueError):
+    """Ein Datumsfeld liegt nicht im Format YYYY-MM-DD vor."""
+
+
 def parse_date(value):
-    if not value:
+    if value in (None, ""):
         return None
-    return datetime.strptime(value, "%Y-%m-%d").date()
+    try:
+        return datetime.strptime(str(value).strip(), "%Y-%m-%d").date()
+    except ValueError as error:
+        raise InvalidDateError(f"Ungueltiges Datum: {value!r}") from error
 
 
 def parse_int(value):
