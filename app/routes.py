@@ -332,6 +332,16 @@ def privacy():
     return render_template("privacy.html")
 
 
+@bp.route("/health")
+def health():
+    """Fuer Docker-HEALTHCHECK und Monitoring: App antwortet und DB ist erreichbar."""
+    try:
+        db.session.execute(db.text("SELECT 1"))
+    except Exception:
+        return jsonify({"status": "error", "database": "unreachable"}), 503
+    return jsonify({"status": "ok"})
+
+
 @bp.route("/hilfe")
 @login_required
 def help_page():
