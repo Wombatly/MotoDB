@@ -13,7 +13,6 @@
         <div class="col-md-6">
             <div class="card auth-card">
                 <div class="card-body">
-                    <div class="d-flex justify-content-end">{{ help_button("konto") }}</div>
                     <h2 class="card-title text-center mb-4">Anmelden</h2>
                     {% if https_required %}
                         <div class="alert alert-danger mb-0">
@@ -44,6 +43,7 @@
                     {% endif %}
                 </div>
             </div>
+            <div class="auth-help">{{ help_button("konto") }}</div>
         </div>
     </div>
 </div>
