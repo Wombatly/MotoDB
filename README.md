@@ -37,7 +37,7 @@ Betrieb auf einem Raspberry Pi per Docker und Nginx bereitgestellt werden.
 - Motorräder bearbeiten und löschen.
 - Motorradbilder hochladen und entfernen; mehrere Bilder pro Motorrad mit
   Titelbild-Auswahl und Galerie-Ansicht.
-- Aktive und verkaufte Motorräder verwalten.
+- Kauf- und Verkaufsdaten (Datum, Preis) erfassen.
 - Automatische Aktualisierung des Kilometerstands anhand der neuesten
   Service- oder Checklistenhistorie.
 
@@ -56,7 +56,7 @@ Betrieb auf einem Raspberry Pi per Docker und Nginx bereitgestellt werden.
 - Daten nach Kategorien wie Motor, Antrieb, Fahrwerk, Bremsen, Reifen, Maße
   und Elektrik strukturieren.
 - Werte, Einheiten und Quellen dokumentieren.
-- Daten per Freitext, JSON-artigem Import oder CSV übernehmen.
+- Daten per CSV einlesen oder direkt im Datenblatt inline pflegen.
 - CSV-Vorlage für technische Daten herunterladen.
 - Einträge und Kategorien per Drag & Drop neu anordnen; Reihenfolge wird
   serverseitig gespeichert.
@@ -114,11 +114,11 @@ Die Python-Abhängigkeiten stehen in `requirements.txt`:
 Flask==3.1.3
 Flask-SQLAlchemy==3.1.1
 Flask-Login==0.6.3
-Flask-WTF==1.2.1
+Flask-WTF==1.3.0
 Pillow==12.2.0
-pypdf==6.12.2
-fpdf2==2.8.5
-gunicorn==22.0.0
+pypdf==6.13.2
+fpdf2==2.8.7
+gunicorn==26.0.0
 Werkzeug==3.1.8
 ```
 
@@ -127,15 +127,19 @@ Werkzeug==3.1.8
 ```text
 .
 ├── app/
-│   ├── __init__.py              # Flask-App-Factory, Datenbank, Schema-Migrationen
+│   ├── __init__.py              # Flask-App-Factory, Datenbank, Schema-Migrationen, Startup-Sperre
 │   ├── models.py                # SQLAlchemy-Modelle
-│   ├── routes.py                # Views, API, Import, Sync, Hilfslogik
-│   ├── auth.py                  # Authentifizierung und Backup-Logik
-│   ├── export_pdf.py            # PDF-Zusammenfassung pro Motorrad (Backup)
+│   ├── routes.py                # Views, API, Import, Sync, Backup, Hilfslogik
+│   ├── auth.py                  # Login/Registrierung, Rate-Limit, Admin, ZIP-Export
+│   ├── export_pdf.py            # PDF-Zusammenfassung pro Motorrad (ZIP-Export)
+│   ├── help_content.py          # Hilfetexte (?-Button und /hilfe)
+│   ├── timeutils.py             # utcnow() als naives UTC-datetime
 │   ├── utils.py                 # Parser, Uploads, Presets, Konstanten
 │   ├── static/
-│   │   ├── css/app.css          # Styling (Dark Theme mit CSS-Variablen)
-│   │   ├── js/app.js            # UI-Verhalten (Tabs, Drag&Drop, Nav)
+│   │   ├── css/app.css          # Styling (Themes über CSS-Variablen, @font-face)
+│   │   ├── fonts/               # IBM Plex Sans/Mono (WOFF2, OFL-Lizenz) für das Logbuch-Theme
+│   │   ├── js/app.js            # UI-Verhalten (Tabs, Drag&Drop, Galerie, Datenblatt)
+│   │   ├── js/help.js           # Hilfe-Panel
 │   │   ├── js/theme.js          # Farbschema-Umschaltung (localStorage)
 │   │   ├── js/indexeddb.js      # Offline-Datenbank im Browser
 │   │   ├── js/sync.js           # Sync-Logik
@@ -144,7 +148,11 @@ Werkzeug==3.1.8
 │   └── templates/
 │       ├── base.html
 │       ├── _macros.html         # Wiederverwendbare Jinja-Makros
-│       ├── settings.html
+│       ├── help.html            # Übersicht aller Hilfethemen
+│       ├── privacy.html         # Datenschutzhinweise
+│       ├── settings.html        # Profil / Einstellungen
+│       ├── admin/               # Nutzerverwaltung
+│       ├── auth/                # Login, Registrierung, Passwort, Konto löschen
 │       ├── motorcycles/
 │       │   ├── detail.html      # Tabs: Historie / Datenblatt / Dokumente
 │       │   └── ...
@@ -157,10 +165,14 @@ Werkzeug==3.1.8
 │   ├── UPDATE_RASPI.md          # Update-Ablauf auf dem Pi
 │   ├── nginx/
 │   └── update-on-pi.sh
-├── instance/
+├── instance/                    # lokale Laufzeitdaten (nicht im Repo)
 │   ├── motorcycle_service.sqlite3
 │   └── uploads/
 ├── tests/
+│   ├── test_security.py
+│   └── test_input_validation.py
+├── AUDIT_REPORT.md              # Letzter Audit-Stand (behoben / offen)
+├── .env.example
 ├── Dockerfile
 ├── compose.yaml
 ├── requirements.txt
@@ -231,6 +243,9 @@ Die Anwendung liest mehrere Einstellungen aus Umgebungsvariablen.
 | `MOTODB_ADMIN_USERNAME` | Benutzername für den ersten Admin einer neuen DB | leer |
 | `MOTODB_ADMIN_EMAIL` | Email für den ersten Admin einer neuen DB | leer |
 | `MOTODB_ADMIN_PASSWORD` | Passwort für den ersten Admin einer neuen DB | leer |
+| `MOTODB_MAX_STORAGE_MB` | Upload-Speicherlimit pro Konto in MB | `500` |
+| `MOTODB_CONTROLLER_NAME` | Verantwortlicher auf der Datenschutzseite | `Betreiber dieser MotoDB-Installation` |
+| `MOTODB_CONTROLLER_CONTACT` | Kontakt auf der Datenschutzseite | `ueber den Administrator dieser Installation` |
 
 Eine Beispielkonfiguration liegt in `.env.example`:
 
@@ -249,6 +264,13 @@ Passwort. Für eine neue öffentliche Datenbank wird der erste Admin stattdessen
 einmalig über `MOTODB_ADMIN_USERNAME`, `MOTODB_ADMIN_EMAIL` und
 `MOTODB_ADMIN_PASSWORD` erzeugt. Das Bootstrap-Passwort muss mindestens 12
 Zeichen lang sein.
+
+Hinweis zu `MOTODB_TRUST_PROXY_HEADERS`: Hinter einem Reverse Proxy (Nginx)
+sieht die App ohne diese Einstellung alle Anfragen von `127.0.0.1`. Das
+IP-basierte Login-Rate-Limit wird dann automatisch deaktiviert (es bleibt das
+Limit pro E-Mail), und beim Start erscheint eine Warnung im Log. Den Wert
+deshalb immer setzen, wenn ein Proxy davor steht – und den App-Port dann nie
+direkt exponieren.
 
 ## Datenhaltung
 
@@ -269,7 +291,7 @@ Speichert Stammdaten zu einem Motorrad:
 - Kaufpreis, Kaufdatum, Verkaufspreis und Verkaufsdatum
 - Hubraum, PS, Farbe
 - Kennzeichen, VIN, Erstzulassung
-- Status `aktiv`
+- Status `aktiv` (derzeit ohne Formularfeld, immer `true`)
 - Notizen
 - Bildpfad (Titelbild; Galerie über `MotorcycleImage`)
 
@@ -347,13 +369,17 @@ kann in den Einstellungen gewählt werden:
 
 - **Nachtschicht** — dunkles Theme (Standard)
 - **Hell** — helles Theme
+- **Werkstatt-Logbuch** — helles Papier-Theme mit IBM Plex Sans/Mono
 - **System** — folgt dem Betriebssystem-Modus (`prefers-color-scheme`)
 
 Die Auswahl wird in `localStorage` unter dem Schlüssel `motodb-theme`
 gespeichert und beim nächsten Seitenaufruf sofort angewandt, bevor das erste
 Pixel gerendert wird (`app/static/js/theme.js`). Das CSS nutzt CSS-Variablen
-(`--bg`, `--surface`, `--text`, …); der Light-Mode überschreibt diese über
-`[data-theme="light"]` auf dem `<html>`-Element.
+(`--page`, `--surface`, `--text`, …); die Themes überschreiben diese über
+`[data-theme="light"]` bzw. `[data-theme="logbuch"]` auf dem `<html>`-Element.
+Die Schriften des Logbuch-Themes liegen als WOFF2 unter `app/static/fonts/`
+(SIL Open Font License) und werden selbst ausgeliefert – es gibt keinen
+externen Font-Abruf.
 
 **Wichtig für Entwicklung:** Die Content-Security-Policy (`script-src 'self'`
 und `style-src 'self'`) lässt keine Inline-`<script>`-Tags und keine
@@ -365,7 +391,7 @@ neue Styles in `app.css`.
 Die Fußleiste enthält drei Einträge:
 
 - **Übersicht** — Motorradliste
-- **+** (FAB) — neuer Serviceeintrag für das zuletzt gewählte Motorrad
+- **+** (FAB) — neues Motorrad anlegen
 - **Profil** — Einstellungen / Konto
 
 ### Motorrad-Detailansicht
@@ -383,11 +409,12 @@ Die Detailseite (`/motorrad/<id>`) ist in drei Reiter aufgeteilt:
 Die Einstellungsseite (`/einstellungen`) ist in Gruppen unterteilt:
 
 - **Darstellung** — Farbschema-Umschalter
-- **Konto** — Passwort ändern
-- **Daten und Backup** — Backup-Pfad und manuelles Backup
-- **Vorlagen und Import** — CSV-Vorlage Datenblatt, CSV-Vorlage Checklisten,
-  globaler Checklisten-Import
-- **Gefahrenzone** — Konto löschen; Admin: Benutzerverwaltung
+- **Konto** — Passwort ändern, Abmelden; Admin: Nutzerverwaltung
+- **Daten und Backup** — Speicherbelegung, ZIP-Export („Backup herunterladen“);
+  Admin: Sicherungsort und „Backup jetzt erstellen“
+- **Vorlagen und Import** — CSV-Vorlage und Import für Checklisten und
+  Datenblatt
+- **Gefahrenzone** — Konto samt aller Daten löschen
 
 ## Checklisten
 
@@ -473,45 +500,36 @@ neue Reihenfolge wird sofort an den Server gesendet
 
 ### CSV-Vorlage
 
-Die Route `/technik/csv-vorlage` liefert eine Vorlage:
+Die Route `/technik/csv-vorlage` liefert ein ZIP mit `datenblatt.csv` und
+einer README:
 
 ```csv
-Kategorie;Eintrag;Wert;Einheit;Quelle
-Motor;Hubraum;583;ccm;Fahrzeugschein
-Motor;Leistung;50;PS;Fahrzeugschein
-Motor;Drehmoment;53;Nm;Werkstatthandbuch
-Antrieb;Getriebe;5-Gang;;Werkstatthandbuch
-Reifen;Reifen vorne;90/90-21;;Handbuch
-Reifen;Reifen hinten;130/80-17;;Handbuch
+Kategorie;Eintrag;Wert;Einheit
+Motor;Hubraum;583;ccm
+Motor;Leistung;50;PS
+Motor;Drehmoment;53;Nm
+Antrieb;Getriebe;5-Gang;
+Reifen;Reifen vorne;90/90-21;
+Reifen;Reifen hinten;130/80-17;
 ```
 
-### Freitext-Import
-
-Der Import akzeptiert einfache Zeilen mit Doppelpunkt oder Gleichheitszeichen:
-
-```text
-Hubraum: 583 ccm
-Leistung: 50 PS
-Tankinhalt = 17 l
-```
-
-Alternativ kann ein einfaches JSON-Objekt importiert werden:
-
-```json
-{
-  "Hubraum": "583 ccm",
-  "Leistung": "50 PS",
-  "Tankinhalt": "17 l"
-}
-```
+Eine optionale fünfte Spalte `Quelle` (z. B. `Fahrzeugschein`) wird beim
+Import ebenfalls übernommen. Semikolon oder Komma als Trennzeichen werden
+automatisch erkannt.
 
 Beim Speichern ersetzt die App die bisherigen technischen Daten des jeweiligen
-Motorrads durch die neu zusammengeführten Zeilen.
+Motorrads durch die neu zusammengeführten Zeilen (gleiche Namen werden
+zusammengefasst, der letzte Wert gewinnt).
+
+Der Parser für Freitext- und JSON-Import (`parse_technical_import`,
+Formularfeld `import_text`) ist im Code vorhanden, wird aber derzeit von
+keiner Seite angeboten.
 
 ## Dokumente
 
-Dokumente werden pro Motorrad unter `Einstellungen → Datenblatt → Dokumente`
-oder direkt über diese Route hochgeladen:
+Dokumente werden pro Motorrad über den Reiter **Dokumente** der
+Motorrad-Detailansicht („Dokument hinzufügen“) oder direkt über diese Route
+hochgeladen:
 
 ```text
 /motorrad/<id>/dokumente/neu
@@ -721,7 +739,8 @@ werden. Es enthält für jedes Motorrad einen eigenen Unterordner mit:
 Zusätzlich liegen alle hochgeladenen Bilder, Belege und Dokumente im Archiv.
 
 Die PDF wird von `app/export_pdf.py` erzeugt. Technische Grundlage ist
-`fpdf2 2.8.5` (latin-1 Zeichensatz).
+`fpdf2` (Version siehe `requirements.txt`) mit den Kernschriften, daher
+latin-1-Zeichensatz; Sonderzeichen wie `€` werden ersetzt.
 
 Auf dem Raspberry Pi ist als Backup-Pfad vorgesehen:
 
@@ -821,17 +840,17 @@ Login kann dann nicht abgeschlossen werden.
 
 | Route | Zweck |
 | --- | --- |
-| `/` | Motorradübersicht mit Suche und Sortierung |
+| `/` | Motorradübersicht (Query-Parameter `q` und `sort` werden ausgewertet, haben aber noch keine Bedienelemente) |
 | `/motorrad/neu` | Motorrad anlegen |
 | `/motorrad/<id>` | Motorrad-Detailansicht (Tabs: Historie / Datenblatt / Dokumente) |
 | `/motorrad/<id>/bearbeiten` | Motorrad bearbeiten |
 | `/motorrad/<id>/service/neu` | Serviceeintrag anlegen |
 | `/service/<id>/bearbeiten` | Serviceeintrag bearbeiten |
 | `/service/<id>/ansicht` | Serviceeintrag anzeigen |
-| `/motorrad/<id>/technik` | Technische Daten für ein Motorrad (CSV/Text-Import) |
+| `/motorrad/<id>/technik` | Technische Daten für ein Motorrad (CSV-Import) |
 | `/motorrad/<id>/datenblatt` | Technische Daten inline speichern (POST) |
 | `/motorrad/<id>/datenblatt/reihenfolge` | Reihenfolge per Drag & Drop speichern (POST JSON) |
-| `/technik` | Technische Daten global bearbeiten |
+| `/technik` | CSV-Import technischer Daten mit Motorrad-Auswahl |
 | `/technik/csv-vorlage` | CSV-Vorlage für technische Daten |
 | `/motorrad/<id>/dokumente/neu` | Dokument hochladen |
 | `/dokumente` | Dokumente hochladen (POST) |
@@ -841,9 +860,20 @@ Login kann dann nicht abgeschlossen werden.
 | `/motorrad/<id>/checklisten` | Checklisten eines Motorrads |
 | `/motorrad/<id>/checklisten/neu` | Checkliste für ein Motorrad anlegen |
 | `/motorrad/<id>/checklisten/import` | Punkteliste für ein Motorrad importieren |
-| `/checklisten/<id>` | Checkliste anzeigen oder durchführen |
+| `/checklisten/<id>` | Vorlage ausfüllen (erzeugt Datensatz) bzw. Datensatz anzeigen |
+| `/checklisten/<id>/vorlage-bearbeiten` | Vorlage bearbeiten |
+| `/checklisten/<id>/loeschen` | Checkliste/Datensatz löschen (POST) |
 | `/checklisten/csv-vorlage` | CSV-Vorlage für Checklisten |
-| `/einstellungen` | App-Einstellungen |
+| `/einstellungen` | Profil und Einstellungen |
+| `/settings/backup-path` | Sicherungsort speichern (POST, Admin) |
+| `/settings/backup` | Server-Backup erstellen (POST, Admin) |
+| `/hilfe` | Übersicht aller Hilfethemen |
+| `/datenschutz` | Datenschutzhinweise (ohne Login) |
+| `/login`, `/logout`, `/register` | Anmeldung, Abmeldung (POST), Registrierung |
+| `/account/password` | Passwort ändern |
+| `/user/export` | ZIP-Export der eigenen Daten |
+| `/user/delete` | Eigenes Konto löschen |
+| `/admin/users` | Nutzerverwaltung (Admin) |
 | `/uploads/<pfad>` | Hochgeladene Dateien ausliefern |
 | `/manifest.webmanifest` | PWA-Manifest |
 | `/service-worker.js` | Service Worker |
@@ -896,8 +926,8 @@ bei einem Reverse Proxy `MOTODB_TRUST_PROXY_HEADERS=true` setzen.
 Beim Deployment müssen neben dem Code auch die Laufzeitdaten migriert werden:
 
 ```bash
-rsync -av instance/motorcycle_service.sqlite3 gregor@192.168.178.102:/srv/motorrad-service/data/
-rsync -av instance/uploads/ gregor@192.168.178.102:/srv/motorrad-service/data/uploads/
+rsync -av instance/motorcycle_service.sqlite3 <benutzer>@<pi-adresse>:/srv/motorrad-service/data/
+rsync -av instance/uploads/ <benutzer>@<pi-adresse>:/srv/motorrad-service/data/uploads/
 ```
 
 ### Sync funktioniert nicht
@@ -906,9 +936,9 @@ Mögliche Ursachen:
 
 - Server ist nicht erreichbar.
 - Browser ist offline.
-- IndexedDB enthält keine offenen Einträge.
-- Backup-Pfad ist ungültig oder nicht beschreibbar.
-- Das Motorrad aus einem Offline-Eintrag wurde inzwischen gelöscht.
+- IndexedDB enthält keine offenen Einträge des angemeldeten Kontos.
+- Das Motorrad aus einem Offline-Eintrag wurde inzwischen gelöscht oder gehört
+  einem anderen Konto (Eintrag wird als abgelehnt markiert).
 
 Der Sync-Button zeigt Statusmeldungen über die Toast-Komponente der App.
 
@@ -924,7 +954,7 @@ Prüfen:
 
 ### Technische Daten werden ersetzt
 
-Beim Speichern technischer Daten (CSV/Text-Import) löscht die App zunächst alle
+Beim Speichern technischer Daten (CSV-Import, Datenblatt) löscht die App zunächst alle
 vorhandenen technischen Daten des Motorrads und legt die neu importierten Werte
 an. Die per Drag & Drop gespeicherte Reihenfolge bleibt durch `position`-Werte
 erhalten. Vor größeren Importen ist ein Backup sinnvoll.

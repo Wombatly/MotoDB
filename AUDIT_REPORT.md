@@ -99,7 +99,7 @@ angepasst; Service-Worker-Cache auf `motodb-v48`.
   setzen** und den Container per `apply-config.sh` neu starten. Ohne diesen
   Wert gilt nur das E-Mail-basierte Login-Limit (Nginx limitiert `/login`
   zusätzlich mit 10 r/min).
-- `MOTODB_ALLOW_REGISTRATION=true` im LAN/Tailscale-Betrieb: jeder im Netz
+- `MOTODB_ALLOW_REGISTRATION=true` im Heimnetz-Betrieb: jeder im Netz
   kann sich registrieren und 200 MB belegen. Bewusst entscheiden.
 - `compose.yaml`/`deploy/update-on-pi.sh` beschreiben einen Compose-Betrieb,
   real läuft `docker run` + `.env.http` (Audit-Punkt aus dem Juni, weiterhin
@@ -137,29 +137,24 @@ angepasst; Service-Worker-Cache auf `motodb-v48`.
 
 ### Veröffentlichung
 
-- **Interne Daten im Repo:** `run.py` druckt `192.168.178.59`; `README.md`
-  und `deploy/README_RASPI.md` enthalten `gregor@192.168.178.102` und den
-  Hostnamen. Vor einem Public-Release durch Platzhalter ersetzen.
-- **README veraltet:** requirements-Block (Flask-WTF 1.2.1 / pypdf 6.12.2 /
-  fpdf2 2.8.5 / gunicorn 22 vs. real 1.3.0 / 6.13.2 / 2.8.7 / 26.0.0),
-  Farbschema-Liste ohne „Werkstatt-Logbuch“, FAB-Beschreibung (legt Motorrad
-  an, nicht Service), „Dokumente unter Einstellungen → Datenblatt“,
-  Datenblatt-CSV mit 5 Spalten vs. 4 in der echten Vorlage, Config-Tabelle
-  ohne `MOTODB_MAX_STORAGE_MB` / `MOTODB_CONTROLLER_NAME` /
-  `MOTODB_CONTROLLER_CONTACT`, Projektstruktur ohne `help_content.py` /
-  `timeutils.py`, Benutzerverwaltung liegt unter „Konto“, nicht „Gefahrenzone“.
+- ~~Interne Daten im Repo~~ (behoben 2026-09-13: `run.py`, `README.md` und
+  `deploy/README_RASPI.md` nutzen Platzhalter statt privater IPs/Benutzer).
+- ~~README veraltet~~ (behoben 2026-09-13: requirements-Block, Farbschema,
+  FAB, Einstellungen, Dokumente, Datenblatt-CSV, Konfig-Tabelle,
+  Projektstruktur, Routen-Tabelle). Nicht vorhandene UI (`aktiv`, Suche,
+  Freitext-Import) ist jetzt als solche gekennzeichnet statt beworben.
 - **Fehlt:** `LICENSE`, CI (Tests laufen nur manuell; Dockerfile kopiert
   `tests/` nicht), `HEALTHCHECK` und non-root `USER` im Dockerfile.
 - `run.py` startet mit `debug=True` (Werkzeug-Debugger = Remote-Code-Execution,
   falls jemand das produktiv nutzt). Aus `FLASK_DEBUG` lesen.
-- `AUDIT_REPORT.md` beschreibt das Tailscale-Setup; für ein öffentliches Repo
-  ggf. nach `docs/` verschieben oder kürzen.
+- `AUDIT_REPORT.md` für ein öffentliches Repo ggf. nach `docs/` verschieben
+  oder kürzen.
 
 ## Empfohlene Reihenfolge
 
 1. `.env.http` anpassen und Container neu bauen/starten (die Fixes aus diesem
    Audit sind erst nach `docker build` + `apply-config.sh` aktiv).
-2. README-Inkonsistenzen und interne IPs/Namen bereinigen; `LICENSE` ergänzen.
+2. `LICENSE` ergänzen (README und interne IPs/Namen sind bereinigt).
 3. Toten Code entfernen (`aktiv`, `import_text`, `AuditLog`, `split_lines`,
    Legacy-Bildroute, doppelte `disk_usage`).
 4. Dockerfile: non-root User, `HEALTHCHECK`, Tests im Build ausführbar; CI.
