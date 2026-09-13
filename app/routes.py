@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date
 from app.timeutils import utcnow
 from io import BytesIO
 from pathlib import Path
@@ -44,7 +44,6 @@ from app.utils import (
     parse_checklist_item_file,
     parse_int,
     parse_technical_csv,
-    parse_technical_import,
     save_upload,
 )
 
@@ -179,10 +178,7 @@ DOCUMENT_CATEGORIES = [
 
 @bp.app_context_processor
 def inject_settings():
-    return {
-        "backup_path": get_backup_path(),
-        "disk_usage": get_disk_usage(),
-    }
+    return {"backup_path": get_backup_path()}
 
 
 @bp.errorhandler(InvalidDateError)
@@ -284,30 +280,8 @@ def datetime_filter(value):
 @bp.route("/")
 @login_required
 def index():
-    query = current_user_motorcycles_query()
-    search = request.args.get("q", "").strip()
-    sort = request.args.get("sort", "marke")
-
-    if search:
-        like = f"%{search}%"
-        query = query.filter(
-            db.or_(Motorcycle.marke.ilike(like), Motorcycle.modell.ilike(like))
-        )
-
-    if sort == "baujahr":
-        query = query.order_by(Motorcycle.baujahr.desc().nullslast())
-    elif sort == "kilometerstand":
-        query = query.order_by(Motorcycle.kilometerstand.desc().nullslast())
-    else:
-        query = query.order_by(Motorcycle.marke, Motorcycle.modell)
-
-    motorcycles = query.all()
-    return render_template(
-        "motorcycles/index.html",
-        motorcycles=motorcycles,
-        search=search,
-        sort=sort,
-    )
+    motorcycles = current_user_motorcycles_query().order_by(Motorcycle.marke, Motorcycle.modell).all()
+    return render_template("motorcycles/index.html", motorcycles=motorcycles)
 
 
 @bp.route("/settings/backup-path", methods=["POST"])
@@ -642,26 +616,6 @@ def motorcycle_edit(motorrad_id):
         title="Motorrad bearbeiten",
         gallery_images=ordered_motorcycle_images(motorcycle),
     )
-
-
-@bp.route("/motorrad/<int:motorrad_id>/bild-loeschen", methods=["POST"])
-@login_required
-def motorcycle_image_delete(motorrad_id):
-    motorcycle = require_motorcycle_ownership(motorrad_id)
-    current_image = (
-        MotorcycleImage.query.filter_by(motorcycle_id=motorrad_id, path=motorcycle.bild)
-        .order_by(MotorcycleImage.position, MotorcycleImage.id)
-        .first()
-    )
-    if current_image:
-        delete_upload_file(current_image.path)
-        db.session.delete(current_image)
-        db.session.flush()
-    else:
-        delete_upload_file(motorcycle.bild)
-    sync_motorcycle_primary_image(motorcycle)
-    db.session.commit()
-    return redirect(url_for("main.motorcycle_edit", motorrad_id=motorrad_id))
 
 
 @bp.route("/motorrad/<int:motorrad_id>/bilder/<int:image_id>/loeschen", methods=["POST"])
@@ -1185,10 +1139,6 @@ def fill_motorcycle(motorcycle):
     motorcycle.erstzulassung = parse_date(request.form.get("erstzulassung"))
     motorcycle.verkauft_am = parse_date(request.form.get("verkauft_am"))
     motorcycle.verkaufspreis = parse_int(request.form.get("verkaufspreis"))
-    if "aktiv" in request.form:
-        motorcycle.aktiv = request.form.get("aktiv") == "on"
-    elif motorcycle.id is None and motorcycle.aktiv is None:
-        motorcycle.aktiv = True
     motorcycle.notizen = request.form.get("notizen")
 
 
@@ -1383,10 +1333,6 @@ def sync_motorcycle_primary_image(motorcycle):
     motorcycle.bild = images[0].path if images else None
 
 
-def split_lines(text):
-    return [line.strip().strip("-") for line in (text or "").splitlines() if line.strip().strip("-")]
-
-
 def group_checklists_by_interval(checklists):
     groups = []
     labels = {}
@@ -1402,19 +1348,12 @@ def group_checklists_by_interval(checklists):
 def find_motorcycle_for_checklist_row(row):
     motorrad_id = parse_int(row.get("motorrad_id"))
     if motorrad_id:
-        motorcycle = db.session.get(Motorcycle, motorrad_id)
-        if motorcycle and current_user.is_authenticated:
-            return motorcycle if motorcycle.user_id == current_user.id else None
-        return motorcycle
+        return current_user_motorcycles_query().filter_by(id=motorrad_id).first()
 
     label = (row.get("motorrad") or "").strip().lower()
     if not label:
         return None
-    query = Motorcycle.query
-    if current_user.is_authenticated:
-        query = query.filter_by(user_id=current_user.id)
-    motorcycles = query.all()
-    for motorcycle in motorcycles:
+    for motorcycle in current_user_motorcycles_query().all():
         full_name = f"{motorcycle.marke} {motorcycle.modell}".strip().lower()
         if label in {full_name, motorcycle.marke.lower(), motorcycle.modell.lower()}:
             return motorcycle
@@ -1634,7 +1573,6 @@ def save_technical_specs(motorcycle):
             }
         )
 
-    rows.extend(parse_technical_import(request.form.get("import_text")))
     rows.extend(parse_technical_csv(request.files.get("csv_file")))
 
     merged_rows = list(merge_technical_rows(rows))

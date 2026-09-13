@@ -2,7 +2,6 @@ from datetime import datetime
 from app.timeutils import utcnow
 import csv
 import io
-import json
 from pathlib import Path
 import re
 from uuid import uuid4
@@ -162,51 +161,6 @@ def parse_int(value):
         return None
     digits = "".join(character for character in str(value) if character.isdigit())
     return int(digits) if digits else None
-
-
-def parse_technical_import(text):
-    if not text:
-        return []
-
-    text = text.strip()
-    parsed = []
-    try:
-        data = json.loads(text)
-        if isinstance(data, dict):
-            for name, value in data.items():
-                parsed.append(
-                    {
-                        "name": str(name).strip(),
-                        "wert": "" if value is None else str(value).strip(),
-                        "einheit": "",
-                        "kategorie": "Import",
-                        "quelle": "",
-                    }
-                )
-            return [row for row in parsed if row["name"]]
-    except json.JSONDecodeError:
-        pass
-
-    for line in text.splitlines():
-        line = line.strip().strip("-")
-        if not line:
-            continue
-        if ":" in line:
-            name, value = line.split(":", 1)
-        elif "=" in line:
-            name, value = line.split("=", 1)
-        else:
-            continue
-        parsed.append(
-            {
-                "name": name.strip(),
-                "wert": value.strip(),
-                "einheit": "",
-                "kategorie": "Import",
-                "quelle": "",
-            }
-        )
-    return [row for row in parsed if row["name"]]
 
 
 def parse_technical_csv(file_storage):

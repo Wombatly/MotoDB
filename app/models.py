@@ -1,4 +1,3 @@
-from datetime import datetime
 from app.timeutils import utcnow
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -21,23 +20,12 @@ class User(UserMixin, db.Model):
     technical_specs = db.relationship('TechnicalSpec', backref='user', cascade='all, delete-orphan', lazy=True)
     checklists = db.relationship('ServiceChecklist', backref='user', cascade='all, delete-orphan', lazy=True)
     documents = db.relationship('MotorcycleDocument', backref='user', cascade='all, delete-orphan', lazy=True)
-    audit_logs = db.relationship('AuditLog', backref='user', cascade='all, delete-orphan', lazy=True)
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password, method="pbkdf2:sha256")
 
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
-
-
-class AuditLog(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    action = db.Column(db.String(80), nullable=False)  # CREATE, UPDATE, DELETE
-    table_name = db.Column(db.String(80), nullable=False)
-    record_id = db.Column(db.Integer)
-    changes_json = db.Column(db.Text)
-    created_at = db.Column(db.DateTime, default=utcnow, nullable=False)
 
 
 class Motorcycle(db.Model):
@@ -57,7 +45,6 @@ class Motorcycle(db.Model):
     erstzulassung = db.Column(db.Date)
     verkauft_am = db.Column(db.Date)
     verkaufspreis = db.Column(db.Integer)
-    aktiv = db.Column(db.Boolean, default=True, nullable=False)
     notizen = db.Column(db.Text)
     bild = db.Column(db.String(255))
     created_at = db.Column(db.DateTime, default=utcnow, nullable=False)

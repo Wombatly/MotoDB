@@ -316,6 +316,35 @@ class InputValidationTestCase(unittest.TestCase):
         self.assertIn("default-src 'self'", csp)
         self.assertNotIn("googleapis", csp)
 
+    def test_schema_update_drops_legacy_aktiv_column_and_audit_log(self):
+        import sqlite3
+        from app import ensure_schema_updates
+
+        db_path = os.path.join(self.tempdir.name, "motodb.sqlite3")
+        raw = sqlite3.connect(db_path)
+        raw.execute("ALTER TABLE motorcycle ADD COLUMN aktiv BOOLEAN NOT NULL DEFAULT 1")
+        raw.execute("CREATE TABLE audit_log (id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL, action VARCHAR(80))")
+        raw.commit()
+        raw.close()
+
+        with self.app.app_context():
+            ensure_schema_updates()
+
+        raw = sqlite3.connect(db_path)
+        columns = {row[1] for row in raw.execute("PRAGMA table_info(motorcycle)")}
+        tables = {row[0] for row in raw.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        raw.close()
+        self.assertNotIn("aktiv", columns)
+        self.assertNotIn("audit_log", tables)
+
+        # Neue Motorraeder lassen sich danach weiterhin anlegen.
+        response = self.client.post("/motorrad/neu", data={"marke": "BMW", "modell": "R1100RS"})
+        self.assertEqual(response.status_code, 302)
+
+    def test_removed_legacy_image_route_is_gone(self):
+        response = self.client.post(f"/motorrad/{self.motorrad_id}/bild-loeschen")
+        self.assertEqual(response.status_code, 404)
+
 
 def _hold_startup_lock(lock_path, seconds):
     import fcntl

@@ -192,7 +192,6 @@ def build_motorcycle_pdf(motorcycle, services, specs, checklists, documents, tit
     if motorcycle.verkauft_am:
         kv("Verkauft am", _date(motorcycle.verkauft_am))
         kv("Verkaufspreis", _eur(motorcycle.verkaufspreis))
-    kv("Status", "Aktiv" if motorcycle.aktiv else "Inaktiv")
     if motorcycle.notizen:
         pdf.ln(1)
         para("Notizen", style="B")
