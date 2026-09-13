@@ -545,3 +545,10 @@ document.querySelectorAll("form").forEach((form) => {
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("/service-worker.js");
 }
+
+// Offline-Fallback-Seite: sobald die Verbindung zurueck ist, die Startseite laden.
+if (document.querySelector("[data-offline-retry]")) {
+  window.addEventListener("online", () => {
+    window.location.href = "/";
+  });
+}

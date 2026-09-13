@@ -352,6 +352,31 @@ class InputValidationTestCase(unittest.TestCase):
                 self.assertEqual(response.status_code, 503)
                 self.assertEqual(response.get_json()["status"], "error")
 
+    def test_pwa_manifest_icons_and_offline_fallback(self):
+        client = self.app.test_client()  # ohne Login
+        with client.get("/manifest.webmanifest") as response:
+            self.assertEqual(response.status_code, 200)
+            manifest = json.loads(response.get_data(as_text=True))
+        self.assertGreaterEqual(len(manifest["icons"]), 2)
+        self.assertTrue(any(icon.get("purpose") == "maskable" for icon in manifest["icons"]))
+        for icon in manifest["icons"]:
+            with client.get(icon["src"]) as response:
+                self.assertEqual(response.status_code, 200, icon["src"])
+                self.assertEqual(response.mimetype, icon["type"], icon["src"])
+
+        with client.get("/offline") as response:
+            self.assertEqual(response.status_code, 200)
+            self.assertIn("Du bist offline", response.get_data(as_text=True))
+
+        with client.get("/service-worker.js") as response:
+            worker = response.get_data(as_text=True)
+        self.assertIn('OFFLINE_URL = "/offline"', worker)
+        self.assertNotIn('caches.match("/")', worker)
+
+        page = self.client.get("/einstellungen").get_data(as_text=True)
+        self.assertIn('rel="apple-touch-icon"', page)
+        self.assertIn('icons/icon.svg', page)
+
     def test_removed_legacy_image_route_is_gone(self):
         response = self.client.post(f"/motorrad/{self.motorrad_id}/bild-loeschen")
         self.assertEqual(response.status_code, 404)

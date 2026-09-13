@@ -332,6 +332,12 @@ def privacy():
     return render_template("privacy.html")
 
 
+@bp.route("/offline")
+def offline():
+    """Vom Service Worker vorgecachte Fallback-Seite fuer Navigationen ohne Netz."""
+    return render_template("offline.html")
+
+
 @bp.route("/health")
 def health():
     """Fuer Docker-HEALTHCHECK und Monitoring: App antwortet und DB ist erreichbar."""

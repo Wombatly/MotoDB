@@ -93,9 +93,12 @@ Betrieb auf einem Raspberry Pi per Docker und Nginx bereitgestellt werden.
 
 ### PWA-Grundlagen
 
-- Webmanifest unter `/manifest.webmanifest`.
-- Service Worker unter `/service-worker.js`.
-- App-ähnliche Nutzung auf mobilen Geräten möglich.
+- Webmanifest unter `/manifest.webmanifest` mit Icons (192/512 px, zusätzlich
+  „maskable“) – die App ist auf Android/iOS/Desktop installierbar.
+- Service Worker unter `/service-worker.js`: cacht nur die App-Shell (CSS, JS,
+  Fonts, Icons), nie Seiten mit Nutzerdaten. Ohne Netz liefert er für
+  Seitenaufrufe die vorgecachte Seite `/offline`, die zur Startseite
+  zurückführt, sobald die Verbindung wieder da ist.
 
 ## Technik-Stack
 
@@ -141,6 +144,7 @@ Werkzeug==3.1.8
 │   ├── static/
 │   │   ├── css/app.css          # Styling (Themes über CSS-Variablen, @font-face)
 │   │   ├── fonts/               # IBM Plex Sans/Mono (WOFF2, OFL-Lizenz) für das Logbuch-Theme
+│   │   ├── icons/               # PWA-/Favicon-Icons (SVG, PNG 192/512, maskable, Apple)
 │   │   ├── js/app.js            # UI-Verhalten (Tabs, Drag&Drop, Galerie, Datenblatt)
 │   │   ├── js/help.js           # Hilfe-Panel
 │   │   ├── js/theme.js          # Farbschema-Umschaltung (localStorage)
@@ -152,6 +156,7 @@ Werkzeug==3.1.8
 │       ├── base.html
 │       ├── _macros.html         # Wiederverwendbare Jinja-Makros
 │       ├── help.html            # Übersicht aller Hilfethemen
+│       ├── offline.html         # Fallback-Seite des Service Workers
 │       ├── privacy.html         # Datenschutzhinweise
 │       ├── settings.html        # Profil / Einstellungen
 │       ├── admin/               # Nutzerverwaltung
@@ -211,6 +216,16 @@ pip install -r requirements.txt
 ```bash
 python3 run.py
 ```
+
+Der Entwicklungsserver startet ohne Debug-Modus. Für den Werkzeug-Debugger
+und den Auto-Reloader:
+
+```bash
+FLASK_DEBUG=1 python3 run.py
+```
+
+Der Debug-Modus erlaubt Code-Ausführung über den Browser und darf nie in
+einem erreichbaren Netz laufen.
 
 Danach ist die App unter dieser Adresse erreichbar:
 
@@ -900,6 +915,7 @@ Login kann dann nicht abgeschlossen werden.
 | `/hilfe` | Übersicht aller Hilfethemen |
 | `/datenschutz` | Datenschutzhinweise (ohne Login) |
 | `/health` | Healthcheck (ohne Login, prüft DB-Verbindung) |
+| `/offline` | Offline-Fallback-Seite des Service Workers (ohne Login) |
 | `/login`, `/logout`, `/register` | Anmeldung, Abmeldung (POST), Registrierung |
 | `/account/password` | Passwort ändern |
 | `/user/export` | ZIP-Export der eigenen Daten |
