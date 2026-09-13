@@ -1,3 +1,62 @@
+/* IBM Plex (SIL Open Font License, siehe fonts/LICENSE.txt) – selbst gehostet,
+   damit die strikte CSP greift und kein externer Request noetig ist.
+   Nur vom Werkstatt-Logbuch-Theme genutzt. */
+@font-face {
+  font-family: "IBM Plex Sans";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../fonts/IBMPlexSans-Regular-Latin1.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "IBM Plex Sans";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("../fonts/IBMPlexSans-Medium-Latin1.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "IBM Plex Sans";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("../fonts/IBMPlexSans-SemiBold-Latin1.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "IBM Plex Sans";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("../fonts/IBMPlexSans-Bold-Latin1.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../fonts/IBMPlexMono-Regular-Latin1.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("../fonts/IBMPlexMono-Medium-Latin1.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("../fonts/IBMPlexMono-SemiBold-Latin1.woff2") format("woff2");
+}
+
 :root {
   --primary: #f08c3a;
   --primary-contrast: #15171a;
@@ -1460,6 +1519,14 @@ a {
   font-weight: 700;
   text-align: right;
   width: 100%;
+}
+
+.spec-row__unit {
+  color: var(--text-muted);
+  flex: 0 0 auto;
+  font-size: .9em;
+  padding-left: .3rem;
+  white-space: nowrap;
 }
 
 .spec-row small {

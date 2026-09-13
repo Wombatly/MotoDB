@@ -164,6 +164,7 @@ HELP_TOPICS = {
                 "heading": "Daten & Sicherheit",
                 "points": [
                     "<strong>Backup/Export</strong> als ZIP – je Motorrad eine lesbare PDF und eine maschinenlesbare JSON-Datei (für den Re-Import).",
+                    "Admins können zusätzlich mit <strong>Backup jetzt erstellen</strong> Datenbank und Uploads in den eingetragenen Backup-Ordner auf dem Server kopieren.",
                     "<strong>Passwort ändern</strong> jederzeit möglich.",
                     "<strong>CSV-Vorlagen & Import</strong> für Checklisten und Datenblätter.",
                     "In der <strong>Gefahrenzone</strong> kannst du dein Profil samt aller Daten unwiderruflich löschen.",

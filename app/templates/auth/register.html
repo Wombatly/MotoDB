@@ -28,11 +28,13 @@
                             <label for="password_confirm" class="form-label">Passwort wiederholen</label>
                             <input type="password" class="form-control" id="password_confirm" name="password_confirm" required>
                         </div>
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="consent" name="consent" required>
+                            <label class="form-check-label" for="consent">
+                                Ich habe die <a href="{{ url_for('main.privacy') }}" target="_blank" rel="noopener">Datenschutzhinweise</a> gelesen und bin einverstanden.
+                            </label>
+                        </div>
                         <button type="submit" class="btn btn-primary w-100">Registrieren</button>
-                        <p class="text-secondary mt-3 mb-0">
-                            Mit der Registrierung nutzt du MotoDB gemaess den
-                            <a href="{{ url_for('main.privacy') }}">Datenschutzhinweisen</a>.
-                        </p>
                     </form>
                     <div class="text-center mt-3">
                         <p>Du hast bereits ein Konto? <a href="{{ url_for('auth.login') }}">Hier anmelden</a></p>

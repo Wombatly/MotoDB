@@ -1,9 +1,18 @@
-const CACHE_NAME = "motodb-v46";
+const CACHE_NAME = "motodb-v48";
 const APP_SHELL = [
   "/static/css/app.css",
   "/static/js/app.js",
+  "/static/js/help.js",
   "/static/js/indexeddb.js",
   "/static/js/sync.js",
+  "/static/js/theme.js",
+  "/static/fonts/IBMPlexSans-Regular-Latin1.woff2",
+  "/static/fonts/IBMPlexSans-Medium-Latin1.woff2",
+  "/static/fonts/IBMPlexSans-SemiBold-Latin1.woff2",
+  "/static/fonts/IBMPlexSans-Bold-Latin1.woff2",
+  "/static/fonts/IBMPlexMono-Regular-Latin1.woff2",
+  "/static/fonts/IBMPlexMono-Medium-Latin1.woff2",
+  "/static/fonts/IBMPlexMono-SemiBold-Latin1.woff2",
   "/manifest.webmanifest",
 ];
 

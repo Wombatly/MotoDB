@@ -84,9 +84,9 @@ Betrieb auf einem Raspberry Pi per Docker und Nginx bereitgestellt werden.
 ### Offline-Unterstützung
 
 - Serviceformulare können offline im Browser gespeichert werden.
-- Offline-Daten landen in IndexedDB.
-- Über den Sync-Button werden offene Einträge später an den Server übertragen.
-- Vor einem Sync wird optional ein Backup der bestehenden Daten erstellt.
+- Offline-Daten landen in IndexedDB, gebunden an das angemeldete Konto.
+- Über den Sync-Button werden offene Einträge später an den Server übertragen;
+  nur vom Server bestätigte Einträge werden lokal entfernt.
 
 ### PWA-Grundlagen
 
@@ -536,15 +536,21 @@ Offline gespeicherte freie Serviceeinträge landen im Object Store
 Offline gespeicherte Checklisten-Serviceeinträge landen im Object Store
 `pendingChecklistServices`.
 
+Jeder Offline-Eintrag wird mit der ID des angemeldeten Nutzers gespeichert.
+Der Sync sendet nur Einträge des aktuell angemeldeten Kontos; Einträge anderer
+Konten im selben Browser bleiben liegen, bis sich deren Besitzer anmeldet.
+
 Beim Klick auf `Sync` sendet der Browser die offenen Daten an:
 
 ```text
 POST /api/sync
 ```
 
-Die App erstellt vor der Synchronisierung ein Backup, sofern in den
-Einstellungen ein gültiger Backup-Pfad hinterlegt ist. Anschließend werden die
-neuen Serviceeinträge und Checklistenhistorien serverseitig gespeichert.
+Der Server bestätigt jeden Eintrag einzeln (`accepted`/`rejected`, siehe
+API-Endpunkte). Nur bestätigte Einträge werden aus IndexedDB gelöscht.
+Abgelehnte Einträge (z. B. gelöschtes Motorrad, ungültiges Datum) bleiben
+markiert erhalten: der automatische Sync überspringt sie, beim manuellen Sync
+fragt die App, ob sie verworfen werden sollen.
 
 Wenn der Browser wieder online geht, versucht die App automatisch eine
 Synchronisierung.
@@ -637,8 +643,21 @@ Payload:
 }
 ```
 
-Die Antwort enthält neu angelegte Serviceeinträge und neu angelegte
-Checklistenhistorien.
+Antwort:
+
+```json
+{
+  "created": [],
+  "checklist_services": [],
+  "accepted": { "services": [0], "checklist_services": [] },
+  "rejected": { "services": [1], "checklist_services": [] }
+}
+```
+
+`accepted` und `rejected` enthalten die Indizes der gesendeten Listen. Ein
+Eintrag wird abgelehnt, wenn das Motorrad nicht dem angemeldeten Nutzer gehört,
+die Checklisten-Vorlage nicht zum Motorrad passt oder ein Datum nicht im Format
+`YYYY-MM-DD` vorliegt. Ungültige Bodies (kein JSON-Objekt) liefern `400`.
 
 ## Uploads und Belege
 
@@ -674,12 +693,17 @@ Der Backup-Pfad wird in der App unter `Einstellungen → Daten und Backup`
 gepflegt. Intern liegt er als `AppSetting` mit dem Schlüssel `backup_path`
 in der Datenbank.
 
-Wenn ein gültiger Pfad gesetzt ist, erstellt `POST /api/sync` vor der
-Übernahme von Offline-Daten einen Sicherungsordner:
+Admins können unter `Einstellungen → Daten und Backup` mit **Backup jetzt
+erstellen** einen Sicherungsordner im hinterlegten Pfad anlegen
+(`POST /settings/backup`):
 
 ```text
-motorrad_service_sync_<YYYYMMDD_HHMMSS>/
+motorrad_service_backup_<YYYYMMDD_HHMMSS>/
+├── motorcycle_service.sqlite3   # konsistente Kopie über die SQLite-Backup-API
+└── uploads/                     # kompletter Upload-Ordner
 ```
+
+Der Offline-Sync erstellt kein Backup mehr.
 
 ### Manuelles Backup (ZIP-Download)
 

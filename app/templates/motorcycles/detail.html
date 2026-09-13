@@ -101,7 +101,8 @@
                 <div class="spec-row__body">
                   <span data-spec-field-name>{{ spec.name }}</span>
                   <div class="spec-row__value">
-                    <input class="spec-input spec-input--value" name="wert" value="{{ spec.wert or '' }}{% if spec.einheit %} {{ spec.einheit }}{% endif %}" aria-label="{{ spec.name }} Wert">
+                    <input class="spec-input spec-input--value" name="wert" value="{{ spec.wert or '' }}" aria-label="{{ spec.name }} Wert{% if spec.einheit %} in {{ spec.einheit }}{% endif %}">
+                    {% if spec.einheit %}<span class="spec-row__unit">{{ spec.einheit }}</span>{% endif %}
                     <input type="hidden" name="einheit" value="{{ spec.einheit or '' }}">
                   </div>
                 </div>
