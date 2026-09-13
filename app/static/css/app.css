@@ -2160,6 +2160,12 @@ a {
 }
 
 /* ---------- Kontextsensitive Hilfe ---------- */
+.auth-help {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 0.75rem;
+}
+
 .help-trigger svg {
   width: 1.15rem;
   height: 1.15rem;
