@@ -27,6 +27,7 @@ Betrieb auf einem Raspberry Pi per Docker und Nginx bereitgestellt werden.
 - [Backups](#backups)
 - [Docker und Raspberry-Pi-Deployment](#docker-und-raspberry-pi-deployment)
 - [Wartung und Fehlersuche](#wartung-und-fehlersuche)
+- [Lizenz](#lizenz)
 
 ## Funktionsumfang
 
@@ -172,6 +173,7 @@ Werkzeug==3.1.8
 │   ├── test_security.py
 │   └── test_input_validation.py
 ├── AUDIT_REPORT.md              # Letzter Audit-Stand (behoben / offen)
+├── LICENSE                      # MIT
 ├── .env.example
 ├── Dockerfile
 ├── compose.yaml
@@ -291,7 +293,6 @@ Speichert Stammdaten zu einem Motorrad:
 - Kaufpreis, Kaufdatum, Verkaufspreis und Verkaufsdatum
 - Hubraum, PS, Farbe
 - Kennzeichen, VIN, Erstzulassung
-- Status `aktiv` (derzeit ohne Formularfeld, immer `true`)
 - Notizen
 - Bildpfad (Titelbild; Galerie über `MotorcycleImage`)
 
@@ -520,10 +521,6 @@ automatisch erkannt.
 Beim Speichern ersetzt die App die bisherigen technischen Daten des jeweiligen
 Motorrads durch die neu zusammengeführten Zeilen (gleiche Namen werden
 zusammengefasst, der letzte Wert gewinnt).
-
-Der Parser für Freitext- und JSON-Import (`parse_technical_import`,
-Formularfeld `import_text`) ist im Code vorhanden, wird aber derzeit von
-keiner Seite angeboten.
 
 ## Dokumente
 
@@ -840,7 +837,7 @@ Login kann dann nicht abgeschlossen werden.
 
 | Route | Zweck |
 | --- | --- |
-| `/` | Motorradübersicht (Query-Parameter `q` und `sort` werden ausgewertet, haben aber noch keine Bedienelemente) |
+| `/` | Motorradübersicht (Garage) |
 | `/motorrad/neu` | Motorrad anlegen |
 | `/motorrad/<id>` | Motorrad-Detailansicht (Tabs: Historie / Datenblatt / Dokumente) |
 | `/motorrad/<id>/bearbeiten` | Motorrad bearbeiten |
@@ -1006,3 +1003,9 @@ Raspberry-Pi-Anleitung öffnen:
 ```text
 deploy/README_RASPI.md
 ```
+
+## Lizenz
+
+MotoDB steht unter der [MIT-Lizenz](LICENSE). Die mitgelieferten Schriften
+IBM Plex Sans/Mono (`app/static/fonts/`) stehen unter der SIL Open Font
+License 1.1 (siehe `app/static/fonts/LICENSE.txt`).

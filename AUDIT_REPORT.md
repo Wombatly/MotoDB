@@ -116,18 +116,12 @@ angepasst; Service-Worker-Cache auf `motodb-v48`.
 
 ### Inkonsistenzen und toter Code
 
-- `Motorcycle.aktiv`: Model und `fill_motorcycle` unterstützen es, kein
-  Formular bietet es an; README bewirbt „Aktive und verkaufte Motorräder
-  verwalten“. Entweder Feld ins Formular oder aus README streichen.
-- `index()` unterstützt `q`/`sort` ohne UI; `import_text`
-  (Freitext/JSON-Import technischer Daten) wird verarbeitet, kommt in keinem
-  Template vor, ist aber im README dokumentiert.
-- `AuditLog` ohne Schreibstelle, `split_lines` ungenutzt, Legacy-Route
-  `/motorrad/<id>/bild-loeschen` neben der Galerie-Route (Juni-Punkte).
-- `disk_usage` wird per Context-Processor auf jeder Seite berechnet und in
-  `admin_users` nochmals; genutzt nur in `admin/users.html`.
-- Hilfetext „Motorrad anlegen“ nennt ein Kilometerstand-Feld, das Formular hat
-  keines (Kilometerstand wird aus Services/Checklisten abgeleitet).
+- ~~Toter Code~~ (behoben 2026-09-13): `Motorcycle.aktiv` (inkl. DB-Spalte
+  per Migration), `q`/`sort` in `index()`, `import_text`/`parse_technical_import`,
+  `AuditLog` (Tabelle wird gelöscht), `split_lines`, Legacy-Route
+  `/motorrad/<id>/bild-loeschen`, doppeltes `disk_usage` (jetzt nur in
+  `admin_users`), tote Anonym-Zweige in `find_motorcycle_for_checklist_row`,
+  unbenutzte `datetime`-Imports. Hilfetext „Motorrad anlegen“ korrigiert.
 - `parse_int` streicht alle Nicht-Ziffern: `1.500,50` → `150050`. Die UI
   normalisiert sichtbar beim Verlassen des Felds, die API nicht. Beträge sind
   bewusst ganze Euro – in der Hilfe erwähnen.
@@ -143,8 +137,9 @@ angepasst; Service-Worker-Cache auf `motodb-v48`.
   FAB, Einstellungen, Dokumente, Datenblatt-CSV, Konfig-Tabelle,
   Projektstruktur, Routen-Tabelle). Nicht vorhandene UI (`aktiv`, Suche,
   Freitext-Import) ist jetzt als solche gekennzeichnet statt beworben.
-- **Fehlt:** `LICENSE`, CI (Tests laufen nur manuell; Dockerfile kopiert
-  `tests/` nicht), `HEALTHCHECK` und non-root `USER` im Dockerfile.
+- ~~`LICENSE`~~ (MIT, ergänzt 2026-09-13).
+- **Fehlt:** CI (Tests laufen nur manuell; Dockerfile kopiert `tests/`
+  nicht), `HEALTHCHECK` und non-root `USER` im Dockerfile.
 - `run.py` startet mit `debug=True` (Werkzeug-Debugger = Remote-Code-Execution,
   falls jemand das produktiv nutzt). Aus `FLASK_DEBUG` lesen.
 - `AUDIT_REPORT.md` für ein öffentliches Repo ggf. nach `docs/` verschieben
@@ -152,10 +147,9 @@ angepasst; Service-Worker-Cache auf `motodb-v48`.
 
 ## Empfohlene Reihenfolge
 
-1. `.env.http` anpassen und Container neu bauen/starten (die Fixes aus diesem
-   Audit sind erst nach `docker build` + `apply-config.sh` aktiv).
-2. `LICENSE` ergänzen (README und interne IPs/Namen sind bereinigt).
-3. Toten Code entfernen (`aktiv`, `import_text`, `AuditLog`, `split_lines`,
-   Legacy-Bildroute, doppelte `disk_usage`).
+1. ~~`.env.http` anpassen und Container neu bauen/starten~~ (erledigt 2026-09-13).
+2. ~~`LICENSE` ergänzen; README und interne IPs/Namen bereinigen~~ (erledigt).
+3. ~~Toten Code entfernen~~ (erledigt).
 4. Dockerfile: non-root User, `HEALTHCHECK`, Tests im Build ausführbar; CI.
-5. PWA-Manifest-Icons und Service-Worker-Fallback.
+5. PWA-Manifest-Icons und Service-Worker-Fallback; `run.py` ohne festes
+   `debug=True`.

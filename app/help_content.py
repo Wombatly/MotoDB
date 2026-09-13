@@ -49,12 +49,12 @@ HELP_TOPICS = {
                 "heading": "Felder",
                 "points": [
                     "<strong>Marke & Modell</strong> erscheinen als Titel auf der Karte und überall in der App.",
-                    "<strong>Baujahr & Kilometerstand</strong> helfen bei Service-Intervallen und der Übersicht.",
+                    "<strong>Baujahr, Hubraum, PS</strong> und Kaufdaten sind optional. Der <strong>Kilometerstand</strong> wird nicht hier eingetragen, sondern aus deinen Service-Einträgen und Checklisten abgeleitet.",
                     "<strong>Titelbild</strong>: Lade ein Foto hoch – es wird auf der Karte und in der Detailansicht gezeigt.",
                 ],
             },
         ],
-        "tip": "Den Kilometerstand kannst du jederzeit nachpflegen; Service-Einträge nutzen ihn als Bezug.",
+        "tip": "Trag den aktuellen Kilometerstand beim ersten Service-Eintrag ein – die Karte übernimmt ihn automatisch.",
     },
     "motorrad_detail": {
         "title": "Motorrad-Detailseite",

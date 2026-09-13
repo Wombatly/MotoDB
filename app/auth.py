@@ -3,7 +3,6 @@ import json
 import re
 import shutil
 import zipfile
-from datetime import datetime
 from app.timeutils import utcnow
 from functools import wraps
 from io import BytesIO
@@ -484,7 +483,6 @@ def user_export():
                     'erstzulassung': motorcycle.erstzulassung.isoformat() if motorcycle.erstzulassung else None,
                     'verkauft_am': motorcycle.verkauft_am.isoformat() if motorcycle.verkauft_am else None,
                     'verkaufspreis': motorcycle.verkaufspreis,
-                    'aktiv': motorcycle.aktiv,
                     'notizen': motorcycle.notizen,
                     'titelbild': motorcycle.bild,
                     'created_at': motorcycle.created_at.isoformat(),
@@ -531,8 +529,6 @@ def user_delete():
             flash('Bestätigung falsch. Konto wurde nicht gelöscht.', 'danger')
             return redirect(url_for('auth.user_delete'))
 
-        user_id = current_user.id
-
         delete_user_uploads(current_user)
         db.session.delete(current_user)
         db.session.commit()
@@ -548,7 +544,7 @@ def user_delete():
 @login_required
 @admin_required
 def admin_users():
-    from app.routes import user_storage_usage_bytes, MAX_USER_STORAGE_BYTES
+    from app.routes import get_disk_usage, user_storage_usage_bytes, MAX_USER_STORAGE_BYTES
 
     users = User.query.order_by(User.username, User.email).all()
     user_storage = {user.id: user_storage_usage_bytes(user.id) for user in users}
@@ -559,26 +555,11 @@ def admin_users():
         "checklists": ServiceChecklist.query.count(),
         "admins": sum(1 for user in users if user.is_admin),
     }
-    disk_usage = None
-    try:
-        usage = shutil.disk_usage(current_app.instance_path)
-        percent_used = round((usage.used / usage.total) * 100) if usage.total else 0
-        disk_usage = {
-            "path": current_app.instance_path,
-            "total": usage.total,
-            "used": usage.used,
-            "free": usage.free,
-            "percent_used": min(percent_used, 100),
-            "percent_free": max(100 - percent_used, 0),
-        }
-    except OSError:
-        disk_usage = None
-
     return render_template(
         'admin/users.html',
         users=users,
         stats=stats,
-        disk_usage=disk_usage,
+        disk_usage=get_disk_usage(),
         user_storage=user_storage,
         storage_limit=MAX_USER_STORAGE_BYTES,
     )

@@ -1,5 +1,4 @@
 from contextlib import contextmanager
-from datetime import datetime
 from app.timeutils import utcnow
 import fcntl
 import mimetypes
@@ -282,6 +281,16 @@ def ensure_schema_updates():
                 )
                 """
             )
+
+        # Aufraeumen: AuditLog hatte nie eine Schreibstelle, "aktiv" nie ein
+        # Formularfeld (immer true). Beides wurde 2026-09 entfernt.
+        connection.exec_driver_sql("DROP TABLE IF EXISTS audit_log")
+        motorcycle_columns = {
+            row[1]
+            for row in connection.exec_driver_sql("PRAGMA table_info(motorcycle)")
+        }
+        if "aktiv" in motorcycle_columns:
+            connection.exec_driver_sql("ALTER TABLE motorcycle DROP COLUMN aktiv")
 
         # Einmalige Bereinigung: fruehere Datenblatt-Autosaves haben die Einheit
         # an den Wert angehaengt ("583 ccm" / "583 ccm ccm" bei Einheit "ccm").
