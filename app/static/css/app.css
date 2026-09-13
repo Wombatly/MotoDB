@@ -52,6 +52,85 @@
 [data-theme="light"] .user-row__self { color: #14532d; }
 [data-theme="light"] .empty-state { border-color: #aab5c4; }
 
+/* ---------- Werkstatt-Logbuch (optionales drittes Farbschema) ---------- */
+[data-theme="logbuch"] {
+  --primary: #2f5c74;
+  --primary-contrast: #fbf8f1;
+  --primary-dark: #1d1b17;
+  --primary-soft: rgb(47 92 116 / 10%);
+  --primary-line: rgb(42 39 31 / 22%);
+  --surface: #fbf8f1;
+  --surface-raised: #fbf8f1;
+  --surface-sunken: #f4efe1;
+  --elevated: #f4efe1;
+  --page: #ece6d5;
+  --line: rgb(42 39 31 / 12%);
+  --text: #2a271f;
+  --text-muted: #6b6559;
+  --danger: #8a4a34;
+  --danger-soft: #b5624a;
+  --danger-line: rgb(138 74 52 / 35%);
+  --shadow: 0 1px 2px rgb(42 39 31 / 6%), 0 10px 22px rgb(42 39 31 / 9%);
+}
+
+[data-theme="logbuch"] body { font-family: "IBM Plex Sans", system-ui, sans-serif; }
+
+[data-theme="logbuch"] .navbar { background: rgb(251 248 241 / 88%); border-bottom-color: rgb(42 39 31 / 14%); }
+[data-theme="logbuch"] .bottom-nav { background: rgb(251 248 241 / 92%); box-shadow: 0 -14px 34px rgb(42 39 31 / 12%); border-radius: 14px 14px 0 0; }
+[data-theme="logbuch"] .menu-toggle { background: rgb(251 248 241 / 75%); }
+[data-theme="logbuch"] .image-manager__nav { background: rgb(251 248 241 / 88%); }
+[data-theme="logbuch"] .image-manager__badge { background: rgb(251 248 241 / 90%); }
+[data-theme="logbuch"] .alert-success { background: #eef5ea; border-color: #bcd9ac; color: #3f5c2c; }
+[data-theme="logbuch"] .alert-danger { background: #f5e9e3; border-color: #d9b8a8; color: #6b3323; }
+[data-theme="logbuch"] .alert-info { background: #eaf1f4; border-color: #b9d2dc; color: #2f5c74; }
+[data-theme="logbuch"] .alert-warning { background: #f7eede; border-color: #e0c493; color: #7a5218; }
+[data-theme="logbuch"] .notice { background: #eef5ea; border-color: #bcd9ac; color: #3f5c2c; }
+[data-theme="logbuch"] .notice-warning { background: #f7eede; border-color: #e0c493; color: #7a5218; }
+[data-theme="logbuch"] .user-row__self { color: #3f5c2c; }
+[data-theme="logbuch"] .empty-state { border-color: rgb(42 39 31 / 30%); }
+
+[data-theme="logbuch"] .brand-mark { border-radius: 8px; box-shadow: 0 10px 22px rgb(47 92 116 / 16%); }
+[data-theme="logbuch"] .brand-mark--large { border-radius: 12px; }
+[data-theme="logbuch"] .btn,
+[data-theme="logbuch"] .btn-icon,
+[data-theme="logbuch"] .chip,
+[data-theme="logbuch"] .pill,
+[data-theme="logbuch"] .image-delete-button { border-radius: 8px; }
+[data-theme="logbuch"] .btn-primary { box-shadow: none; }
+[data-theme="logbuch"] .bottom-nav__fab { box-shadow: 0 10px 22px rgb(42 39 31 / 22%); }
+[data-theme="logbuch"] .form-control,
+[data-theme="logbuch"] .form-select,
+[data-theme="logbuch"] .menu-input,
+[data-theme="logbuch"] .spec-input { border-radius: 6px; }
+[data-theme="logbuch"] .motorcycle-card,
+[data-theme="logbuch"] .empty-state,
+[data-theme="logbuch"] .form-panel,
+[data-theme="logbuch"] .service-entry,
+[data-theme="logbuch"] .notes,
+[data-theme="logbuch"] .history-list,
+[data-theme="logbuch"] .spec-group,
+[data-theme="logbuch"] .settings-list,
+[data-theme="logbuch"] .preset-card,
+[data-theme="logbuch"] .checklist-item,
+[data-theme="logbuch"] .checklist-builder-row,
+[data-theme="logbuch"] .detail-hero,
+[data-theme="logbuch"] .nav-actions,
+[data-theme="logbuch"] .card,
+[data-theme="logbuch"] .toast,
+[data-theme="logbuch"] .alert,
+[data-theme="logbuch"] .data-grid div,
+[data-theme="logbuch"] .category-row,
+[data-theme="logbuch"] .user-row { border-radius: 10px; }
+
+[data-theme="logbuch"] .motorcycle-card__meta,
+[data-theme="logbuch"] .history-row__amount,
+[data-theme="logbuch"] .storage-row,
+[data-theme="logbuch"] .data-grid strong,
+[data-theme="logbuch"] .spec-row__value,
+[data-theme="logbuch"] .path-truncate {
+  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -1233,36 +1312,102 @@ a {
   min-width: 0;
 }
 
-.spec-drag {
+.spec-menu-toggle {
   align-items: center;
   color: var(--text-muted);
-  cursor: grab;
+  cursor: pointer;
   display: inline-flex;
   justify-content: center;
-  touch-action: none;
-  user-select: none;
 }
 
-.spec-drag:active {
-  cursor: grabbing;
-}
-
-.spec-drag svg {
+.spec-menu-toggle svg {
   fill: currentColor;
   height: 1.15rem;
   pointer-events: none;
   width: 1.15rem;
 }
 
-.spec-row__drag {
+.spec-menu-toggle:hover,
+.spec-menu-toggle:focus-visible,
+.spec-menu-toggle[aria-expanded="true"] {
+  color: var(--primary);
+}
+
+.spec-menu-toggle--group {
+  float: right;
+  height: 1.4rem;
+  margin-left: .5rem;
+  width: 1.4rem;
+}
+
+.spec-row__menu-toggle {
   height: 2rem;
   width: 1.6rem;
 }
 
-.spec-group__drag {
-  float: right;
-  height: 1.4rem;
-  margin-left: .5rem;
+.is-move-armed {
+  cursor: grab;
+  outline: 2px dashed var(--primary);
+  outline-offset: 2px;
+}
+
+.is-move-armed:active {
+  cursor: grabbing;
+}
+
+.spec-menu-panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  min-width: 13rem;
+  overflow: hidden;
+  position: fixed;
+  z-index: 50;
+}
+
+.spec-row--new {
+  background: var(--surface-sunken);
+}
+
+.spec-row--new .spec-input {
+  background: var(--page);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: .35rem .5rem;
+}
+
+.spec-row--new .spec-input--value {
+  text-align: left;
+}
+
+.spec-row__save {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: inline-flex;
+  height: 2rem;
+  justify-content: center;
+  padding: 0;
+  width: 1.6rem;
+}
+
+.spec-row__save svg {
+  fill: none;
+  height: 1.15rem;
+  pointer-events: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+  width: 1.15rem;
+}
+
+.spec-row__save:hover,
+.spec-row__save:focus-visible {
+  color: var(--primary);
 }
 
 .spec-row.is-dragging,

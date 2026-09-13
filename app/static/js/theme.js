@@ -2,7 +2,7 @@
   var KEY = "motodb-theme";
 
   function resolve(pref) {
-    if (pref === "light" || pref === "dark") return pref;
+    if (pref === "light" || pref === "dark" || pref === "logbuch") return pref;
     return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
   }
 
@@ -10,7 +10,10 @@
     var theme = resolve(pref);
     document.documentElement.dataset.theme = theme;
     var meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute("content", theme === "dark" ? "#15171a" : "#f6efe7");
+    if (meta) {
+      var color = theme === "dark" ? "#15171a" : theme === "logbuch" ? "#ece6d5" : "#f6efe7";
+      meta.setAttribute("content", color);
+    }
   }
 
   function read() {

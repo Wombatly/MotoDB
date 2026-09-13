@@ -85,21 +85,21 @@
       {% for category, specs in technical_groups %}
         <details class="spec-group" data-spec-category>
           <summary>
-            <span class="spec-drag spec-group__drag" data-drag-handle="category" aria-label="Kategorie verschieben" title="Verschieben">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="6" r="1.5"></circle><circle cx="15" cy="6" r="1.5"></circle><circle cx="9" cy="12" r="1.5"></circle><circle cx="15" cy="12" r="1.5"></circle><circle cx="9" cy="18" r="1.5"></circle><circle cx="15" cy="18" r="1.5"></circle></svg>
+            <span class="spec-menu-toggle spec-menu-toggle--group" data-spec-menu-toggle="category" tabindex="0" role="button" aria-haspopup="true" aria-expanded="false" aria-label="Kategorie-Optionen" title="Optionen">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="12" cy="19" r="1.6"></circle></svg>
             </span>
-            {{ category or "Allgemein" }}
+            <span data-spec-category-name>{{ category or "Allgemein" }}</span>
           </summary>
           <div class="spec-list">
             {% for spec in specs %}
               <div class="spec-row" data-spec-row data-spec-id="{{ spec.id }}">
                 <input type="hidden" name="kategorie" value="{{ spec.kategorie or 'Allgemein' }}">
                 <input type="hidden" name="name" value="{{ spec.name }}">
-                <span class="spec-drag spec-row__drag" data-drag-handle="spec" aria-label="Eintrag verschieben" title="Verschieben">
-                  <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="6" r="1.5"></circle><circle cx="15" cy="6" r="1.5"></circle><circle cx="9" cy="12" r="1.5"></circle><circle cx="15" cy="12" r="1.5"></circle><circle cx="9" cy="18" r="1.5"></circle><circle cx="15" cy="18" r="1.5"></circle></svg>
+                <span class="spec-menu-toggle spec-row__menu-toggle" data-spec-menu-toggle="field" tabindex="0" role="button" aria-haspopup="true" aria-expanded="false" aria-label="Feld-Optionen" title="Optionen">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="12" cy="19" r="1.6"></circle></svg>
                 </span>
                 <div class="spec-row__body">
-                  <span>{{ spec.name }}</span>
+                  <span data-spec-field-name>{{ spec.name }}</span>
                   <div class="spec-row__value">
                     <input class="spec-input spec-input--value" name="wert" value="{{ spec.wert or '' }}{% if spec.einheit %} {{ spec.einheit }}{% endif %}" aria-label="{{ spec.name }} Wert">
                     <input type="hidden" name="einheit" value="{{ spec.einheit or '' }}">
