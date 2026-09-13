@@ -102,10 +102,10 @@
                   <span>{{ spec.name }}</span>
                   <div class="spec-row__value">
                     <input class="spec-input spec-input--value" name="wert" value="{{ spec.wert or '' }}{% if spec.einheit %} {{ spec.einheit }}{% endif %}" aria-label="{{ spec.name }} Wert">
-                    <input type="hidden" name="einheit" value="">
+                    <input type="hidden" name="einheit" value="{{ spec.einheit or '' }}">
                   </div>
                 </div>
-                <input type="hidden" name="quelle" value="">
+                <input type="hidden" name="quelle" value="{{ spec.quelle or '' }}">
               </div>
             {% endfor %}
           </div>
