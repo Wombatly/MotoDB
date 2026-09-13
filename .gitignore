@@ -11,3 +11,6 @@ __pycache__/
 .env
 instance/
 backups/
+
+# Lokale Betriebs-Hinweise fuer Claude (Pi-interne IPs/Pfade)
+CLAUDE.md
