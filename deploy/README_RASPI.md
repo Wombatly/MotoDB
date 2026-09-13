@@ -1,6 +1,7 @@
 # Motorrad Service auf Raspberry Pi 4B
 
-Zielsystem: Debian 13 `trixie`, `aarch64`, Benutzer `gregor`, Host `rabbithole`.
+Zielsystem: Debian 13 `trixie`, `aarch64`. In den Befehlen `<benutzer>` durch den
+Linux-Benutzer auf dem Pi und `<pi-adresse>` durch dessen IP oder Hostnamen ersetzen.
 
 ## 1. Grundsystem
 
@@ -38,7 +39,7 @@ EOF
 ```bash
 sudo apt update
 sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-sudo usermod -aG docker gregor
+sudo usermod -aG docker <benutzer>
 ```
 
 Einmal abmelden und neu anmelden. Test:
@@ -75,7 +76,7 @@ docker stats --no-stream                # zeigt jetzt echte RAM-Werte
 sudo mkdir -p /srv/motorrad-service/app
 sudo mkdir -p /srv/motorrad-service/data/uploads
 sudo mkdir -p /srv/motorrad-service/data/backups
-sudo chown -R gregor:gregor /srv/motorrad-service
+sudo chown -R <benutzer>:<benutzer> /srv/motorrad-service
 ```
 
 ## 4. App auf den Pi kopieren
@@ -88,7 +89,7 @@ rsync -av --delete \
   --exclude ".DS_Store" \
   --exclude "__pycache__" \
   --exclude "instance" \
-  ./ gregor@192.168.178.102:/srv/motorrad-service/app/
+  ./ <benutzer>@<pi-adresse>:/srv/motorrad-service/app/
 ```
 
 ## 5. Bestehende Daten migrieren
@@ -96,8 +97,8 @@ rsync -av --delete \
 Vom Mac aus im Projektordner:
 
 ```bash
-rsync -av instance/motorcycle_service.sqlite3 gregor@192.168.178.102:/srv/motorrad-service/data/
-rsync -av instance/uploads/ gregor@192.168.178.102:/srv/motorrad-service/data/uploads/
+rsync -av instance/motorcycle_service.sqlite3 <benutzer>@<pi-adresse>:/srv/motorrad-service/data/
+rsync -av instance/uploads/ <benutzer>@<pi-adresse>:/srv/motorrad-service/data/uploads/
 ```
 
 ## 6. Environment-Datei auf dem Pi
@@ -165,7 +166,7 @@ sudo systemctl reload nginx
 Danach im Heimnetz öffnen:
 
 ```text
-http://192.168.178.102/
+http://<pi-adresse>/
 ```
 
 Diese HTTP-Adresse ist für den Heimnetz-Betrieb ohne
