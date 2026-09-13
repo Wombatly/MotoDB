@@ -127,9 +127,9 @@ angepasst; Service-Worker-Cache auf `motodb-v48`.
 - `parse_int` streicht alle Nicht-Ziffern: `1.500,50` → `150050`. Die UI
   normalisiert sichtbar beim Verlassen des Felds, die API nicht. Beträge sind
   bewusst ganze Euro – in der Hilfe erwähnen.
-- Service Worker: Fallback `caches.match("/")` kann nie treffen, da `/` nicht
-  gecacht wird; nach Offline-Speichern wird auf eine nicht gecachte Seite
-  umgeleitet. Manifest hat `icons: []` → PWA nicht installierbar.
+- ~~Service-Worker-Fallback / Manifest ohne Icons~~ (2026-09-13: vorgecachte
+  Seite `/offline` als Navigations-Fallback, Icons 192/512 + maskable + SVG +
+  Apple-Touch-Icon, App installierbar).
 
 ### Veröffentlichung
 
@@ -143,8 +143,7 @@ angepasst; Service-Worker-Cache auf `motodb-v48`.
 - ~~CI, `HEALTHCHECK`, non-root `USER`~~ (2026-09-13: GitHub-Actions-Workflow
   mit pyflakes/Tests/Docker-Build, mehrstufiges Dockerfile mit Test-Stage,
   `USER motodb` (UID 1000), `HEALTHCHECK` auf `/health`).
-- `run.py` startet mit `debug=True` (Werkzeug-Debugger = Remote-Code-Execution,
-  falls jemand das produktiv nutzt). Aus `FLASK_DEBUG` lesen.
+- ~~`run.py` mit festem `debug=True`~~ (2026-09-13: Debug nur mit `FLASK_DEBUG=1`).
 - `AUDIT_REPORT.md` für ein öffentliches Repo ggf. nach `docs/` verschieben
   oder kürzen.
 
@@ -154,5 +153,9 @@ angepasst; Service-Worker-Cache auf `motodb-v48`.
 2. ~~`LICENSE` ergänzen; README und interne IPs/Namen bereinigen~~ (erledigt).
 3. ~~Toten Code entfernen~~ (erledigt).
 4. ~~Dockerfile: non-root User, `HEALTHCHECK`, Tests im Build ausführbar; CI~~ (erledigt).
-5. PWA-Manifest-Icons und Service-Worker-Fallback; `run.py` ohne festes
-   `debug=True`.
+5. ~~PWA-Manifest-Icons und Service-Worker-Fallback; `run.py` ohne festes
+   `debug=True`~~ (erledigt).
+
+Alle Punkte der Liste vom 2026-09-13 sind damit abgearbeitet. Verbleibend
+sind nur die bewusst zurückgestellten Themen (Sitzungs-Timeout, Rate-Limit
+pro Worker, Sicherungsort auf `/data` einschränken, Alembic-Migrationen).

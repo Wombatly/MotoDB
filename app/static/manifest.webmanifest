@@ -1,9 +1,17 @@
 {
   "name": "MotoDB",
   "short_name": "MotoDB",
+  "description": "Motorräder, Services, Checklisten und Dokumente – deine Garage.",
+  "lang": "de",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#15171a",
   "theme_color": "#15171a",
-  "icons": []
+  "icons": [
+    { "src": "/static/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/static/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/static/icons/icon-192-maskable.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/static/icons/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
 }

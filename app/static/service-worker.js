@@ -1,4 +1,5 @@
-const CACHE_NAME = "motodb-v48";
+const CACHE_NAME = "motodb-v49";
+const OFFLINE_URL = "/offline";
 const APP_SHELL = [
   "/static/css/app.css",
   "/static/js/app.js",
@@ -13,7 +14,10 @@ const APP_SHELL = [
   "/static/fonts/IBMPlexMono-Regular-Latin1.woff2",
   "/static/fonts/IBMPlexMono-Medium-Latin1.woff2",
   "/static/fonts/IBMPlexMono-SemiBold-Latin1.woff2",
+  "/static/icons/icon.svg",
+  "/static/icons/icon-192.png",
   "/manifest.webmanifest",
+  OFFLINE_URL,
 ];
 
 self.addEventListener("install", (event) => {
@@ -37,18 +41,28 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  // HTML-Seiten enthalten private Daten und werden nie gecacht. Ohne Netz
+  // bekommt der Nutzer stattdessen die vorgecachte Offline-Seite.
+  if (event.request.mode === "navigate" && url.pathname !== OFFLINE_URL) {
+    event.respondWith(fetch(event.request).catch(() => caches.match(OFFLINE_URL)));
+    return;
+  }
+
   if (!APP_SHELL.includes(url.pathname) && !url.pathname.startsWith("/static/")) {
     event.respondWith(fetch(event.request));
     return;
   }
 
+  // App-Shell (CSS, JS, Fonts, Icons, Offline-Seite): Netz zuerst, Cache als Fallback.
   event.respondWith(
     fetch(event.request)
       .then((response) => {
-        const copy = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+        if (response.ok) {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+        }
         return response;
       })
-      .catch(() => caches.match(event.request).then((cached) => cached || caches.match("/")))
+      .catch(() => caches.match(event.request))
   );
 });
