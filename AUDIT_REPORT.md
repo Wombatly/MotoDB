@@ -111,8 +111,10 @@ angepasst; Service-Worker-Cache auf `motodb-v48`.
 - Kein Sitzungs-Timeout (bewusst verschoben, unverändert).
 - Dokument-Kategorie wird nicht gegen `DOCUMENT_CATEGORIES` validiert;
   String-Längen werden von SQLite nicht erzwungen. Unkritisch.
-- Der Sicherungsort ist ein frei wählbarer Serverpfad (nur Admin). Für
-  Public Hosting auf ein festes Verzeichnis unterhalb `/data` einschränken.
+- Der Sicherungsort ist ein frei wählbarer Serverpfad (nur Admin). Seit dem
+  Nicht-Root-Container kann er ohnehin nur innerhalb beschreibbarer Pfade
+  (praktisch `/data`) liegen; für Public Hosting zusätzlich im Code auf
+  `/data` einschränken.
 
 ### Inkonsistenzen und toter Code
 
@@ -138,8 +140,9 @@ angepasst; Service-Worker-Cache auf `motodb-v48`.
   Projektstruktur, Routen-Tabelle). Nicht vorhandene UI (`aktiv`, Suche,
   Freitext-Import) ist jetzt als solche gekennzeichnet statt beworben.
 - ~~`LICENSE`~~ (MIT, ergänzt 2026-09-13).
-- **Fehlt:** CI (Tests laufen nur manuell; Dockerfile kopiert `tests/`
-  nicht), `HEALTHCHECK` und non-root `USER` im Dockerfile.
+- ~~CI, `HEALTHCHECK`, non-root `USER`~~ (2026-09-13: GitHub-Actions-Workflow
+  mit pyflakes/Tests/Docker-Build, mehrstufiges Dockerfile mit Test-Stage,
+  `USER motodb` (UID 1000), `HEALTHCHECK` auf `/health`).
 - `run.py` startet mit `debug=True` (Werkzeug-Debugger = Remote-Code-Execution,
   falls jemand das produktiv nutzt). Aus `FLASK_DEBUG` lesen.
 - `AUDIT_REPORT.md` für ein öffentliches Repo ggf. nach `docs/` verschieben
@@ -150,6 +153,6 @@ angepasst; Service-Worker-Cache auf `motodb-v48`.
 1. ~~`.env.http` anpassen und Container neu bauen/starten~~ (erledigt 2026-09-13).
 2. ~~`LICENSE` ergänzen; README und interne IPs/Namen bereinigen~~ (erledigt).
 3. ~~Toten Code entfernen~~ (erledigt).
-4. Dockerfile: non-root User, `HEALTHCHECK`, Tests im Build ausführbar; CI.
+4. ~~Dockerfile: non-root User, `HEALTHCHECK`, Tests im Build ausführbar; CI~~ (erledigt).
 5. PWA-Manifest-Icons und Service-Worker-Fallback; `run.py` ohne festes
    `debug=True`.

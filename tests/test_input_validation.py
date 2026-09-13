@@ -341,6 +341,17 @@ class InputValidationTestCase(unittest.TestCase):
         response = self.client.post("/motorrad/neu", data={"marke": "BMW", "modell": "R1100RS"})
         self.assertEqual(response.status_code, 302)
 
+    def test_health_endpoint_reports_database_state(self):
+        client = self.app.test_client()  # ohne Login
+        with client.get("/health") as response:
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.get_json(), {"status": "ok"})
+
+        with patch("app.db.session.execute", side_effect=RuntimeError("db down")):
+            with client.get("/health") as response:
+                self.assertEqual(response.status_code, 503)
+                self.assertEqual(response.get_json()["status"], "error")
+
     def test_removed_legacy_image_route_is_gone(self):
         response = self.client.post(f"/motorrad/{self.motorrad_id}/bild-loeschen")
         self.assertEqual(response.status_code, 404)

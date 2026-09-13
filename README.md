@@ -1,5 +1,7 @@
 # MotoDB
 
+[![CI](https://github.com/Wombatly/MotoDB/actions/workflows/ci.yml/badge.svg)](https://github.com/Wombatly/MotoDB/actions/workflows/ci.yml)
+
 MotoDB ist eine Flask-Webanwendung zur Verwaltung von Motorrädern,
 Serviceeinträgen, technischen Daten, Checklisten, Dokumenten und Belegen. Das
 Projekt ist auf den privaten Werkstatt- und Fuhrparkbetrieb ausgelegt:
@@ -170,8 +172,10 @@ Werkzeug==3.1.8
 │   ├── motorcycle_service.sqlite3
 │   └── uploads/
 ├── tests/
+│   ├── __init__.py
 │   ├── test_security.py
 │   └── test_input_validation.py
+├── .github/workflows/ci.yml     # GitHub Actions: pyflakes, Tests, Docker-Build
 ├── AUDIT_REPORT.md              # Letzter Audit-Stand (behoben / offen)
 ├── LICENSE                      # MIT
 ├── .env.example
@@ -786,6 +790,35 @@ Im Container wird dieser Pfad als `/data` eingebunden. Dadurch liegen
 Datenbank, Uploads und Backups außerhalb des Containers und bleiben bei
 Updates erhalten.
 
+### Nicht-Root, Healthcheck und Test-Stage
+
+Der Container läuft als Benutzer `motodb` mit UID/GID `1000` (per Build-Arg
+`APP_UID`/`APP_GID` änderbar). Das Daten-Volume muss dieser UID gehören –
+einmalig auf dem Host, ohne `sudo`:
+
+```bash
+docker run --rm -v /srv/motorrad-service/data:/data alpine chown -R 1000:1000 /data
+```
+
+`HEALTHCHECK` ruft alle 30 s `GET /health` auf; die Route antwortet ohne
+Login mit `{"status": "ok"}` und prüft dabei die Datenbankverbindung
+(`503`, wenn sie fehlschlägt). `docker ps` zeigt den Zustand als
+`healthy`/`unhealthy`.
+
+Das Dockerfile ist mehrstufig. Die Stage `test` führt `pyflakes` und alle
+Unit-Tests im Image aus (die Runtime-Stage enthält keine Tests):
+
+```bash
+docker build --target test .
+```
+
+### Continuous Integration
+
+`.github/workflows/ci.yml` läuft bei jedem Push auf `main` und bei Pull
+Requests: `pyflakes` + Unit-Tests unter Python 3.12, danach Docker-Build der
+Test-Stage und des Runtime-Images inklusive Start als Nicht-Root und Warten
+auf `healthy`.
+
 ### Raspberry Pi
 
 Eine ausführliche Deployment-Anleitung steht in:
@@ -866,6 +899,7 @@ Login kann dann nicht abgeschlossen werden.
 | `/settings/backup` | Server-Backup erstellen (POST, Admin) |
 | `/hilfe` | Übersicht aller Hilfethemen |
 | `/datenschutz` | Datenschutzhinweise (ohne Login) |
+| `/health` | Healthcheck (ohne Login, prüft DB-Verbindung) |
 | `/login`, `/logout`, `/register` | Anmeldung, Abmeldung (POST), Registrierung |
 | `/account/password` | Passwort ändern |
 | `/user/export` | ZIP-Export der eigenen Daten |

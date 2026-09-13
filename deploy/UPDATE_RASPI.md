@@ -52,3 +52,16 @@ curl -I http://127.0.0.1:5001
 ```
 
 Im Heimnetz anschließend die normale MotoDB-Adresse öffnen.
+
+## Einmalig: Daten-Volume für den Nicht-Root-Container
+
+Seit 2026-09 läuft der Container als Benutzer `motodb` (UID/GID 1000). Vor dem
+ersten Start der neuen Version müssen alle Dateien im Daten-Volume dieser UID
+gehören (Dateien, die ein früherer Root-Container angelegt hat, gehören noch
+`root`):
+
+```bash
+docker run --rm -v /srv/motorrad-service/data:/data alpine chown -R 1000:1000 /data
+```
+
+Danach zeigt `docker ps` den Container nach ca. 20 s als `healthy`.
