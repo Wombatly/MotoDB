@@ -22,7 +22,7 @@ from flask import (
 from flask_login import login_required, current_user
 
 from app import db
-from app.auth import admin_required
+from app.auth import admin_required, user_motorcycle_ids
 from app.help_content import HELP_TOPICS
 from app.models import (
     AppSetting,
@@ -77,8 +77,20 @@ def require_motorcycle_ownership(motorcycle_id):
     return motorcycle
 
 
+def require_service_ownership(service_id):
+    service = db.get_or_404(ServiceEntry, service_id)
+    if service.user_id != current_user.id:
+        abort(403)
+    return service
+
+
 def current_user_motorcycles_query():
     return Motorcycle.query.filter_by(user_id=current_user.id)
+
+
+def owned_motorcycles():
+    """Alle Motorraeder des angemeldeten Nutzers, sortiert nach Marke und Modell."""
+    return current_user_motorcycles_query().order_by(Motorcycle.marke, Motorcycle.modell).all()
 
 
 def safe_next_url(next_url):
@@ -95,6 +107,20 @@ def resolve_motorcycle(motorcycles, selected_id):
     if selected_id:
         return current_user_motorcycles_query().filter_by(id=selected_id).first()
     return motorcycles[0] if motorcycles else None
+
+
+def selected_motorcycle(motorcycles, motorrad_id):
+    """Motorrad fuer Seiten, die es wahlweise aus der URL oder per Auswahl bekommen.
+
+    GET: URL-Parameter, sonst ?motorrad_id=, sonst das erste eigene Motorrad
+    (None ohne Motorraeder). POST: Auswahl im Formular, sonst URL-Parameter,
+    jeweils mit Ownership-Pruefung.
+    """
+    if request.method == "POST":
+        return require_motorcycle_ownership(parse_int(request.form.get("motorrad_id")) or motorrad_id)
+    if motorrad_id is not None:
+        return require_motorcycle_ownership(motorrad_id)
+    return resolve_motorcycle(motorcycles, parse_int(request.args.get("motorrad_id")))
 
 
 def template_zip_response(zip_filename, files):
@@ -282,7 +308,7 @@ def datetime_filter(value):
 @bp.route("/")
 @login_required
 def index():
-    motorcycles = current_user_motorcycles_query().order_by(Motorcycle.marke, Motorcycle.modell).all()
+    motorcycles = owned_motorcycles()
     return render_template("motorcycles/index.html", motorcycles=motorcycles)
 
 
@@ -359,9 +385,9 @@ def help_page():
 @bp.route("/dokumente", methods=["GET", "POST"])
 @login_required
 def documents():
-    motorcycles = current_user_motorcycles_query().order_by(Motorcycle.marke, Motorcycle.modell).all()
+    motorcycles = owned_motorcycles()
+    motorcycle = selected_motorcycle(motorcycles, None)
     if request.method == "POST":
-        motorcycle = require_motorcycle_ownership(parse_int(request.form.get("motorrad_id")))
         next_url = safe_next_url(request.form.get("next"))
         success_redirect = redirect(next_url or url_for("main.documents", motorrad_id=motorcycle.id))
         document_file = request.files.get("document")
@@ -385,7 +411,6 @@ def documents():
             db.session.commit()
         return success_redirect
 
-    motorcycle = resolve_motorcycle(motorcycles, parse_int(request.args.get("motorrad_id")))
     documents = []
     if motorcycle:
         documents = (
@@ -427,54 +452,6 @@ def document_new(motorrad_id):
     )
 
 
-@bp.route("/checklisten/neu", methods=["GET", "POST"])
-@login_required
-def checklist_new_global():
-    motorcycles = current_user_motorcycles_query().order_by(Motorcycle.marke, Motorcycle.modell).all()
-    if request.method == "POST":
-        motorrad_id = parse_int(request.form.get("motorrad_id"))
-        motorcycle = require_motorcycle_ownership(motorrad_id)
-        checklist = create_checklist_from_form(motorcycle)
-        db.session.commit()
-        return redirect(url_for("main.checklist_index", motorrad_id=checklist.motorrad_id))
-
-    selected_motorcycle = resolve_motorcycle(motorcycles, parse_int(request.args.get("motorrad_id")))
-    preset_key = request.args.get("preset", "")
-    preset = SERVICE_CHECKLIST_PRESETS.get(preset_key, {})
-    return render_template(
-        "checklists/form.html",
-        motorcycle=selected_motorcycle,
-        motorcycles=motorcycles,
-        preset_key=preset_key,
-        preset=preset,
-        presets=SERVICE_CHECKLIST_PRESETS,
-    )
-
-
-@bp.route("/checklisten/import", methods=["GET", "POST"])
-@login_required
-def checklist_import_global():
-    motorcycles = current_user_motorcycles_query().order_by(Motorcycle.marke, Motorcycle.modell).all()
-    if request.method == "POST":
-        imported = create_checklists_from_csv(request.files.get("csv_file"))
-        if imported:
-            db.session.commit()
-            return redirect(url_for("main.checklist_index", motorrad_id=imported[0].motorrad_id))
-
-        motorrad_id = parse_int(request.form.get("motorrad_id"))
-        motorcycle = require_motorcycle_ownership(motorrad_id)
-        checklist = create_checklist_from_form(motorcycle)
-        db.session.commit()
-        return redirect(url_for("main.checklist_index", motorrad_id=checklist.motorrad_id))
-
-    selected_motorcycle = resolve_motorcycle(motorcycles, parse_int(request.args.get("motorrad_id")))
-    return render_template(
-        "checklists/import.html",
-        motorcycle=selected_motorcycle,
-        motorcycles=motorcycles,
-    )
-
-
 @bp.route("/checklisten/csv-vorlage")
 @login_required
 def checklist_csv_template():
@@ -484,28 +461,6 @@ def checklist_csv_template():
             "checklisten.csv": DEFAULT_CHECKLIST_CSV + "\n",
             "README.txt": CHECKLIST_TEMPLATE_README,
         },
-    )
-
-
-@bp.route("/technik", methods=["GET", "POST"])
-@login_required
-def technical_data_global():
-    motorcycles = current_user_motorcycles_query().order_by(Motorcycle.marke, Motorcycle.modell).all()
-    motorcycle = resolve_motorcycle(motorcycles, parse_int(request.values.get("motorrad_id")))
-
-    if request.method == "POST":
-        motorrad_id = parse_int(request.form.get("motorrad_id"))
-        motorcycle = require_motorcycle_ownership(motorrad_id)
-        save_technical_specs(motorcycle)
-        return redirect(url_for("main.motorcycle_detail", motorrad_id=motorcycle.id))
-
-    specs, suggestions = get_technical_context(motorcycle) if motorcycle else ([], [])
-    return render_template(
-        "motorcycles/technical.html",
-        motorcycle=motorcycle,
-        motorcycles=motorcycles,
-        specs=specs,
-        suggestions=suggestions,
     )
 
 
@@ -669,21 +624,21 @@ def motorcycle_delete(motorrad_id):
     return redirect(url_for("main.index"))
 
 
+@bp.route("/technik", methods=["GET", "POST"])
 @bp.route("/motorrad/<int:motorrad_id>/technik", methods=["GET", "POST"])
 @login_required
-def technical_data(motorrad_id):
-    motorcycle = require_motorcycle_ownership(motorrad_id)
+def technical_data(motorrad_id=None):
+    motorcycles = owned_motorcycles()
+    motorcycle = selected_motorcycle(motorcycles, motorrad_id)
     if request.method == "POST":
-        form_motorcycle_id = parse_int(request.form.get("motorrad_id")) or motorrad_id
-        motorcycle = require_motorcycle_ownership(form_motorcycle_id)
         save_technical_specs(motorcycle)
         return redirect(url_for("main.motorcycle_detail", motorrad_id=motorcycle.id))
 
-    specs, suggestions = get_technical_context(motorcycle)
+    specs, suggestions = get_technical_context(motorcycle) if motorcycle else ([], [])
     return render_template(
         "motorcycles/technical.html",
         motorcycle=motorcycle,
-        motorcycles=current_user_motorcycles_query().order_by(Motorcycle.marke, Motorcycle.modell).all(),
+        motorcycles=motorcycles,
         specs=specs,
         suggestions=suggestions,
     )
@@ -733,48 +688,47 @@ def checklist_index(motorrad_id):
     )
 
 
+@bp.route("/checklisten/neu", methods=["GET", "POST"])
 @bp.route("/motorrad/<int:motorrad_id>/checklisten/neu", methods=["GET", "POST"])
 @login_required
-def checklist_new(motorrad_id):
-    motorcycle = require_motorcycle_ownership(motorrad_id)
-    preset_key = request.values.get("preset", "")
-    preset = SERVICE_CHECKLIST_PRESETS.get(preset_key, {})
-
+def checklist_new(motorrad_id=None):
+    motorcycles = owned_motorcycles()
+    motorcycle = selected_motorcycle(motorcycles, motorrad_id)
     if request.method == "POST":
         checklist = create_checklist_from_form(motorcycle)
         db.session.commit()
         return redirect(url_for("main.checklist_index", motorrad_id=checklist.motorrad_id))
 
+    preset_key = request.args.get("preset", "")
     return render_template(
         "checklists/form.html",
         motorcycle=motorcycle,
-        motorcycles=current_user_motorcycles_query().order_by(Motorcycle.marke, Motorcycle.modell).all(),
+        motorcycles=motorcycles,
         preset_key=preset_key,
-        preset=preset,
+        preset=SERVICE_CHECKLIST_PRESETS.get(preset_key, {}),
         presets=SERVICE_CHECKLIST_PRESETS,
     )
 
 
+@bp.route("/checklisten/import", methods=["GET", "POST"])
 @bp.route("/motorrad/<int:motorrad_id>/checklisten/import", methods=["GET", "POST"])
 @login_required
-def checklist_import(motorrad_id):
-    motorcycle = require_motorcycle_ownership(motorrad_id)
+def checklist_import(motorrad_id=None):
+    motorcycles = owned_motorcycles()
     if request.method == "POST":
         imported = create_checklists_from_csv(request.files.get("csv_file"))
         if imported:
             db.session.commit()
             return redirect(url_for("main.checklist_index", motorrad_id=imported[0].motorrad_id))
 
-        form_motorcycle_id = parse_int(request.form.get("motorrad_id")) or motorrad_id
-        motorcycle = require_motorcycle_ownership(form_motorcycle_id)
-        checklist = create_checklist_from_form(motorcycle)
+        checklist = create_checklist_from_form(selected_motorcycle(motorcycles, motorrad_id))
         db.session.commit()
         return redirect(url_for("main.checklist_index", motorrad_id=checklist.motorrad_id))
 
     return render_template(
         "checklists/import.html",
-        motorcycle=motorcycle,
-        motorcycles=current_user_motorcycles_query().order_by(Motorcycle.marke, Motorcycle.modell).all(),
+        motorcycle=selected_motorcycle(motorcycles, motorrad_id),
+        motorcycles=motorcycles,
     )
 
 
@@ -786,7 +740,7 @@ def checklist_edit(checklist_id):
     if request.method == "POST":
         if not checklist.is_template:
             abort(409)
-        record = create_checklist_record_from_template(checklist)
+        record = create_checklist_record_from_form(checklist)
         refresh_motorcycle_mileage(checklist.motorcycle)
         db.session.commit()
         return redirect(url_for("main.checklist_edit", checklist_id=record.id))
@@ -802,7 +756,7 @@ def checklist_template_edit(checklist_id):
     if not checklist.is_template:
         abort(409)
 
-    motorcycles = current_user_motorcycles_query().order_by(Motorcycle.marke, Motorcycle.modell).all()
+    motorcycles = owned_motorcycles()
     if request.method == "POST":
         update_checklist_from_form(checklist)
         db.session.commit()
@@ -855,33 +809,12 @@ def service_new(motorrad_id):
             template_id = parse_int(service_art.split(":")[1])
             template = db.session.get(ServiceChecklist, template_id) if template_id else None
             if template and template.motorrad_id == motorrad_id and template.user_id == current_user.id:
-                record = ServiceChecklist(
-                    motorrad_id=motorrad_id,
-                    user_id=current_user.id,
-                    titel=request.form.get("titel") or template.titel,
-                    intervall_km=template.intervall_km,
-                    intervall_monate=template.intervall_monate,
-                    datum=parse_date(request.form.get("datum")) or date.today(),
-                    kilometerstand=parse_int(request.form.get("kilometerstand")),
-                    anmerkungen=request.form.get("beschreibung"),
-                    is_template=False,
-                    source_template_id=template.id,
-                    completed_at=utcnow(),
+                create_checklist_record_from_form(
+                    template,
+                    completed_field=f"checklist_erledigt_{template.id}",
+                    note_prefix="checklist_anmerkung_",
+                    notes_field="beschreibung",
                 )
-                db.session.add(record)
-                db.session.flush()
-                completed_ids = set(request.form.getlist(f"checklist_erledigt_{template.id}"))
-                for item in template.items:
-                    db.session.add(
-                        ServiceChecklistItem(
-                            checklist_id=record.id,
-                            position=item.position,
-                            text=item.text,
-                            kommentar_vorlage=item.kommentar_vorlage,
-                            erledigt=str(item.id) in completed_ids,
-                            anmerkung=request.form.get(f"checklist_anmerkung_{item.id}"),
-                        )
-                    )
                 refresh_motorcycle_mileage(motorcycle)
                 db.session.commit()
                 return redirect(url_for("main.motorcycle_detail", motorrad_id=motorrad_id))
@@ -913,9 +846,7 @@ def service_new(motorrad_id):
 @bp.route("/service/<int:service_id>/bearbeiten", methods=["GET", "POST"])
 @login_required
 def service_edit(service_id):
-    service = db.get_or_404(ServiceEntry, service_id)
-    if service.user_id != current_user.id:
-        abort(403)
+    service = require_service_ownership(service_id)
     motorcycle = service.motorcycle
     if request.method == "POST":
         fill_service(service)
@@ -944,18 +875,14 @@ def service_edit(service_id):
 @bp.route("/service/<int:service_id>/ansicht")
 @login_required
 def service_detail(service_id):
-    service = db.get_or_404(ServiceEntry, service_id)
-    if service.user_id != current_user.id:
-        abort(403)
+    service = require_service_ownership(service_id)
     return render_template("service/detail.html", service=service, motorcycle=service.motorcycle)
 
 
 @bp.route("/service/<int:service_id>/loeschen", methods=["POST"])
 @login_required
 def service_delete(service_id):
-    service = db.get_or_404(ServiceEntry, service_id)
-    if service.user_id != current_user.id:
-        abort(403)
+    service = require_service_ownership(service_id)
     motorrad_id = service.motorrad_id
     motorcycle = service.motorcycle
     delete_upload_file(service.beleg)
@@ -996,7 +923,7 @@ def api_motorcycles():
     if not current_user.is_authenticated:
         return jsonify([])
 
-    motorcycles = current_user_motorcycles_query().order_by(Motorcycle.marke, Motorcycle.modell).all()
+    motorcycles = owned_motorcycles()
     return jsonify(
         [
             {
@@ -1040,20 +967,7 @@ def api_create_service():
     if motorcycle.user_id != current_user.id:
         abort(403)
 
-    service = ServiceEntry(
-        motorrad_id=motorcycle.id,
-        user_id=current_user.id,
-        titel=data.get("titel"),
-        datum=parse_date(data.get("datum")) or date.today(),
-        kilometerstand=parse_int(data.get("kilometerstand")),
-        beschreibung=data.get("beschreibung"),
-        kosten=parse_int(data.get("kosten")),
-        kategorie=data.get("kategorie") or "Sonstiges",
-        naechster_service_km=parse_int(data.get("naechster_service_km")),
-        naechster_service_datum=parse_date(data.get("naechster_service_datum")),
-    )
-    db.session.add(service)
-    db.session.flush()
+    service = service_from_payload(motorcycle, data)
     refresh_motorcycle_mileage(motorcycle)
     db.session.commit()
     return jsonify(serialize_service(service)), 201
@@ -1095,23 +1009,10 @@ def api_sync():
             rejected["services"].append(index)
             continue
         try:
-            service = ServiceEntry(
-                motorrad_id=motorcycle.id,
-                user_id=current_user.id,
-                titel=item.get("titel"),
-                datum=parse_date(item.get("datum")) or date.today(),
-                kilometerstand=parse_int(item.get("kilometerstand")),
-                beschreibung=item.get("beschreibung"),
-                kosten=parse_int(item.get("kosten")),
-                kategorie=item.get("kategorie") or "Sonstiges",
-                naechster_service_km=parse_int(item.get("naechster_service_km")),
-                naechster_service_datum=parse_date(item.get("naechster_service_datum")),
-            )
+            service = service_from_payload(motorcycle, item)
         except InvalidDateError:
             rejected["services"].append(index)
             continue
-        db.session.add(service)
-        db.session.flush()
         refresh_motorcycle_mileage(motorcycle)
         created.append(serialize_service(service))
         accepted["services"].append(index)
@@ -1160,15 +1061,26 @@ def fill_motorcycle(motorcycle):
     motorcycle.notizen = request.form.get("notizen")
 
 
-def fill_service(service):
-    service.titel = request.form.get("titel")
-    service.datum = parse_date(request.form.get("datum")) or date.today()
-    service.kilometerstand = parse_int(request.form.get("kilometerstand"))
-    service.beschreibung = request.form.get("beschreibung")
-    service.kosten = parse_int(request.form.get("kosten"))
-    service.kategorie = request.form.get("kategorie") or "Sonstiges"
-    service.naechster_service_km = parse_int(request.form.get("naechster_service_km"))
-    service.naechster_service_datum = parse_date(request.form.get("naechster_service_datum"))
+def fill_service(service, data=None):
+    """Service-Felder aus dem Formular (Default) oder einem JSON-Dict uebernehmen."""
+    data = request.form if data is None else data
+    service.titel = data.get("titel")
+    service.datum = parse_date(data.get("datum")) or date.today()
+    service.kilometerstand = parse_int(data.get("kilometerstand"))
+    service.beschreibung = data.get("beschreibung")
+    service.kosten = parse_int(data.get("kosten"))
+    service.kategorie = data.get("kategorie") or "Sonstiges"
+    service.naechster_service_km = parse_int(data.get("naechster_service_km"))
+    service.naechster_service_datum = parse_date(data.get("naechster_service_datum"))
+
+
+def service_from_payload(motorcycle, data):
+    """Neuen Service aus einem JSON-Dict anlegen und flushen (API und Offline-Sync)."""
+    service = ServiceEntry(motorrad_id=motorcycle.id, user_id=current_user.id)
+    fill_service(service, data)
+    db.session.add(service)
+    db.session.flush()
+    return service
 
 
 def unique_checklist_records(records):
@@ -1256,14 +1168,8 @@ def resolve_upload_path(relative_path):
 def user_storage_usage_bytes(user_id):
     """Gesamtgröße aller Upload-Dateien, die den Motorrädern des Users gehören."""
     root = upload_root()
-    motorcycle_ids = [
-        motorcycle_id
-        for (motorcycle_id,) in Motorcycle.query.with_entities(Motorcycle.id)
-        .filter_by(user_id=user_id)
-        .all()
-    ]
     total = 0
-    for motorcycle_id in motorcycle_ids:
+    for motorcycle_id in user_motorcycle_ids(user_id):
         folder = root / str(motorcycle_id)
         if folder.is_dir():
             for path in folder.rglob("*"):
@@ -1306,13 +1212,8 @@ def delete_upload_file(relative_path):
 
 
 def delete_motorcycle_uploads(motorrad_id):
-    root = upload_root()
-    target = (root / str(motorrad_id)).resolve()
-    try:
-        target.relative_to(root)
-    except ValueError:
-        abort(400)
-    if target.is_dir():
+    target = resolve_upload_path(str(motorrad_id))
+    if target and target.is_dir():
         shutil.rmtree(target)
 
 
@@ -1443,22 +1344,29 @@ def create_checklist_from_form(motorcycle):
     db.session.add(checklist)
     db.session.flush()
 
-    item_texts = request.form.getlist("item_text")
-    item_comments = request.form.getlist("item_comment")
-    rows = []
-    for index, text in enumerate(item_texts):
-        text = text.strip()
-        comment = item_comments[index].strip() if index < len(item_comments) else ""
-        if text or comment:
-            rows.append((text or "Prüfpunkt", comment))
-
+    rows = checklist_item_rows_from_form()
     if not rows and preset:
         rows = [(item, "") for item in preset.get("items", [])]
-
     rows.extend(parse_checklist_item_file(request.files.get("item_list_file")))
-    rows = rows[:MAX_CHECKLIST_ITEMS]
+    add_checklist_items(checklist, rows)
+    return checklist
 
-    for position, (text, comment) in enumerate(rows, start=1):
+
+def checklist_item_rows_from_form():
+    """(Text, Kommentar)-Paare aus den item_text/item_comment-Feldern; leere Zeilen entfallen."""
+    texts = request.form.getlist("item_text")
+    comments = request.form.getlist("item_comment")
+    rows = []
+    for index, text in enumerate(texts):
+        text = text.strip()
+        comment = comments[index].strip() if index < len(comments) else ""
+        if text or comment:
+            rows.append((text or "Prüfpunkt", comment))
+    return rows
+
+
+def add_checklist_items(checklist, rows):
+    for position, (text, comment) in enumerate(rows[:MAX_CHECKLIST_ITEMS], start=1):
         db.session.add(
             ServiceChecklistItem(
                 checklist_id=checklist.id,
@@ -1467,7 +1375,6 @@ def create_checklist_from_form(motorcycle):
                 kommentar_vorlage=comment,
             )
         )
-    return checklist
 
 
 def update_checklist_from_form(checklist):
@@ -1479,38 +1386,25 @@ def update_checklist_from_form(checklist):
     checklist.anmerkungen = request.form.get("anmerkungen")
 
     ServiceChecklistItem.query.filter_by(checklist_id=checklist.id).delete()
-    item_texts = request.form.getlist("item_text")
-    item_comments = request.form.getlist("item_comment")
-    rows = []
-    for index, text in enumerate(item_texts):
-        text = text.strip()
-        comment = item_comments[index].strip() if index < len(item_comments) else ""
-        if not text and not comment:
-            continue
-        rows.append((text or "Prüfpunkt", comment))
-    rows = rows[:MAX_CHECKLIST_ITEMS]
-
-    for position, (text, comment) in enumerate(rows, start=1):
-        db.session.add(
-            ServiceChecklistItem(
-                checklist_id=checklist.id,
-                position=position,
-                text=text or "Prüfpunkt",
-                kommentar_vorlage=comment,
-            )
-        )
+    add_checklist_items(checklist, checklist_item_rows_from_form())
 
 
-def create_checklist_record_from_template(template):
+def create_checklist_record(template, data, notes, completed_ids, item_notes):
+    """Ausgefuellte Checkliste aus einer Vorlage anlegen und flushen.
+
+    data liefert Titel/Datum/Kilometerstand (Formular oder JSON-Dict),
+    completed_ids die IDs der erledigten Vorlagen-Punkte als Strings und
+    item_notes die Anmerkung je Vorlagen-Punkt-ID (String).
+    """
     record = ServiceChecklist(
         motorrad_id=template.motorrad_id,
         user_id=template.user_id,
-        titel=request.form.get("titel") or template.titel,
+        titel=data.get("titel") or template.titel,
         intervall_km=template.intervall_km,
         intervall_monate=template.intervall_monate,
-        datum=parse_date(request.form.get("datum")) or date.today(),
-        kilometerstand=parse_int(request.form.get("kilometerstand")),
-        anmerkungen=request.form.get("anmerkungen"),
+        datum=parse_date(data.get("datum")) or date.today(),
+        kilometerstand=parse_int(data.get("kilometerstand")),
+        anmerkungen=notes,
         is_template=False,
         source_template_id=template.id,
         completed_at=utcnow(),
@@ -1518,7 +1412,6 @@ def create_checklist_record_from_template(template):
     db.session.add(record)
     db.session.flush()
 
-    completed_ids = set(request.form.getlist("erledigt"))
     for item in template.items:
         db.session.add(
             ServiceChecklistItem(
@@ -1527,10 +1420,23 @@ def create_checklist_record_from_template(template):
                 text=item.text,
                 kommentar_vorlage=item.kommentar_vorlage,
                 erledigt=str(item.id) in completed_ids,
-                anmerkung=request.form.get(f"anmerkung_{item.id}"),
+                anmerkung=item_notes.get(str(item.id)),
             )
         )
     return record
+
+
+def create_checklist_record_from_form(
+    template, completed_field="erledigt", note_prefix="anmerkung_", notes_field="anmerkungen"
+):
+    """Formular-Variante: Checklisten-Seite (Defaults) und Service-Formular (Praefixe)."""
+    return create_checklist_record(
+        template,
+        request.form,
+        request.form.get(notes_field),
+        set(request.form.getlist(completed_field)),
+        {str(item.id): request.form.get(f"{note_prefix}{item.id}") for item in template.items},
+    )
 
 
 def merge_technical_rows(rows):
@@ -1621,39 +1527,19 @@ def get_technical_context(motorcycle):
 
 
 def create_checklist_record_from_payload(template, data):
-    record = ServiceChecklist(
-        motorrad_id=template.motorrad_id,
-        user_id=template.user_id,
-        titel=data.get("titel") or template.titel,
-        intervall_km=template.intervall_km,
-        intervall_monate=template.intervall_monate,
-        datum=parse_date(data.get("datum")) or date.today(),
-        kilometerstand=parse_int(data.get("kilometerstand")),
-        anmerkungen=data.get("checklist_anmerkungen") or data.get("beschreibung"),
-        is_template=False,
-        source_template_id=template.id,
-        completed_at=utcnow(),
-    )
-    db.session.add(record)
-    db.session.flush()
-
+    """JSON-Variante fuer den Offline-Sync."""
     raw_completed = data.get("completed_item_ids", [])
     completed_ids = {str(item_id) for item_id in raw_completed} if isinstance(raw_completed, list) else set()
     item_notes = data.get("item_notes", {})
     if not isinstance(item_notes, dict):
         item_notes = {}
-    for item in template.items:
-        db.session.add(
-            ServiceChecklistItem(
-                checklist_id=record.id,
-                position=item.position,
-                text=item.text,
-                kommentar_vorlage=item.kommentar_vorlage,
-                erledigt=str(item.id) in completed_ids,
-                anmerkung=item_notes.get(str(item.id)),
-            )
-        )
-    return record
+    return create_checklist_record(
+        template,
+        data,
+        data.get("checklist_anmerkungen") or data.get("beschreibung"),
+        completed_ids,
+        item_notes,
+    )
 
 
 def serialize_service(service):

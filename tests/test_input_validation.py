@@ -381,6 +381,69 @@ class InputValidationTestCase(unittest.TestCase):
         response = self.client.post(f"/motorrad/{self.motorrad_id}/bild-loeschen")
         self.assertEqual(response.status_code, 404)
 
+    def test_global_and_per_motorcycle_routes_share_one_handler(self):
+        """/checklisten/neu, /checklisten/import und /technik sind dieselben Handler
+        wie die Varianten mit Motorrad in der URL; url_for liefert beide URLs."""
+        with self.app.test_request_context():
+            from flask import url_for
+            self.assertEqual(url_for("main.checklist_new"), "/checklisten/neu")
+            self.assertEqual(url_for("main.checklist_new", motorrad_id=7), "/motorrad/7/checklisten/neu")
+            self.assertEqual(url_for("main.checklist_import"), "/checklisten/import")
+            self.assertEqual(url_for("main.technical_data"), "/technik")
+            self.assertEqual(url_for("main.technical_data", motorrad_id=7), "/motorrad/7/technik")
+
+        for url in ("/checklisten/neu", "/checklisten/import", "/technik",
+                    f"/motorrad/{self.motorrad_id}/checklisten/neu",
+                    f"/motorrad/{self.motorrad_id}/checklisten/import",
+                    f"/motorrad/{self.motorrad_id}/technik"):
+            self.assertEqual(self.client.get(url).status_code, 200, url)
+
+        # Globale Variante ohne Motorrad in der URL: Auswahl aus dem Formular.
+        response = self.client.post(
+            "/checklisten/neu",
+            data={"motorrad_id": self.motorrad_id, "titel": "Global", "item_text": ["Punkt A"]},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response.headers["Location"].endswith(f"/motorrad/{self.motorrad_id}/checklisten"))
+        response = self.client.post(
+            "/technik",
+            data={"motorrad_id": self.motorrad_id, "name": ["Hubraum"], "wert": ["583"], "einheit": ["ccm"], "kategorie": ["Motor"]},
+        )
+        self.assertEqual(response.status_code, 302)
+        with self.app.app_context():
+            self.assertEqual(ServiceChecklist.query.filter_by(titel="Global").count(), 1)
+            self.assertEqual(TechnicalSpec.query.filter_by(motorrad_id=self.motorrad_id, name="Hubraum").count(), 1)
+
+    def test_checklist_form_selection_wins_over_url_but_only_for_own_motorcycles(self):
+        response = self.client.post("/motorrad/neu", data={"marke": "BMW", "modell": "R1100RS"})
+        second_id = int(response.headers["Location"].rsplit("/", 1)[1])
+
+        # Im Formular ein anderes eigenes Motorrad gewaehlt: dort landet die Vorlage.
+        response = self.client.post(
+            f"/motorrad/{self.motorrad_id}/checklisten/neu",
+            data={"motorrad_id": second_id, "titel": "Umgehaengt", "item_text": ["Punkt"]},
+        )
+        self.assertEqual(response.status_code, 302)
+        with self.app.app_context():
+            checklist = ServiceChecklist.query.filter_by(titel="Umgehaengt").one()
+            self.assertEqual(checklist.motorrad_id, second_id)
+
+        # Fremdes Motorrad im Formular: 403, nichts angelegt.
+        with self.app.app_context():
+            other = User(username="other", email="other@example.com")
+            other.set_password("12345678")
+            db.session.add(other)
+            db.session.flush()
+            foreign = Motorcycle(user_id=other.id, marke="KTM", modell="690")
+            db.session.add(foreign)
+            db.session.commit()
+            foreign_id = foreign.id
+        for url in (f"/motorrad/{self.motorrad_id}/checklisten/neu", "/checklisten/neu", "/technik"):
+            response = self.client.post(url, data={"motorrad_id": foreign_id, "titel": "Fremd", "item_text": ["x"]})
+            self.assertEqual(response.status_code, 403, url)
+        with self.app.app_context():
+            self.assertEqual(ServiceChecklist.query.filter_by(titel="Fremd").count(), 0)
+
 
 def _hold_startup_lock(lock_path, seconds):
     import fcntl
