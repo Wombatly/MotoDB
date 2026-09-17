@@ -2,10 +2,10 @@ import ipaddress
 import json
 import re
 import shutil
+import tempfile
 import zipfile
 from app.timeutils import utcnow
 from functools import wraps
-from io import BytesIO
 from pathlib import Path
 from time import monotonic
 
@@ -23,6 +23,7 @@ AUTH_ATTEMPTS = {}
 AUTH_RATE_LIMIT_WINDOW_SECONDS = 15 * 60
 LOGIN_MAX_FAILURES = 5
 REGISTER_MAX_POSTS = 10
+EXPORT_SPOOL_BYTES = 4 * 1024 * 1024
 
 # Bewusst einfach: genau ein "@", kein Whitespace, Domain mit Punkt.
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
@@ -86,14 +87,31 @@ def register_rate_limit_keys():
     return [auth_rate_limit_key("register")] if ip_rate_limit_usable() else []
 
 
+def prune_auth_attempts(now=None, window_seconds=AUTH_RATE_LIMIT_WINDOW_SECONDS):
+    """Abgelaufene Eintraege entfernen.
+
+    Jeder Login-Versuch legt einen Key pro E-Mail an; ohne Aufraeumen wuechse
+    das Dict mit jeder probierten Adresse unbegrenzt (Speicher-DoS ueber die
+    Login-Seite). Laeuft bei jedem Auth-Request, das Dict ist klein.
+    """
+    now = monotonic() if now is None else now
+    for key in [key for key, attempts in AUTH_ATTEMPTS.items()
+                if not attempts or now - attempts[-1] >= window_seconds]:
+        AUTH_ATTEMPTS.pop(key, None)
+
+
 def recent_auth_attempts(key, window_seconds=AUTH_RATE_LIMIT_WINDOW_SECONDS):
     now = monotonic()
+    prune_auth_attempts(now, window_seconds)
     attempts = [
         timestamp
         for timestamp in AUTH_ATTEMPTS.get(key, [])
         if now - timestamp < window_seconds
     ]
-    AUTH_ATTEMPTS[key] = attempts
+    if attempts:
+        AUTH_ATTEMPTS[key] = attempts
+    else:
+        AUTH_ATTEMPTS.pop(key, None)
     return attempts
 
 
@@ -298,7 +316,10 @@ def user_export():
         motorcycle.id: export_folder_name(motorcycle, used_names)
         for motorcycle in motorcycles
     }
-    zip_buffer = BytesIO()
+    # Das ZIP kann bis zum Speicherlimit des Accounts plus PDFs gross werden;
+    # ab wenigen MB wird es deshalb auf die Platte ausgelagert statt komplett im
+    # RAM gehalten (parallele Exporte wuerden sonst den Server aushungern).
+    zip_buffer = tempfile.SpooledTemporaryFile(max_size=EXPORT_SPOOL_BYTES)
     with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
         zf.writestr(
             'profil.json',

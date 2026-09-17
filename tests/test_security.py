@@ -13,7 +13,15 @@ from werkzeug.datastructures import FileStorage
 
 from app import create_app, db
 from app.models import Motorcycle, MotorcycleImage, ServiceChecklist, ServiceChecklistItem, ServiceEntry, TechnicalSpec, User
-from app.utils import parse_checklist_item_file
+from app.utils import (
+    MAX_CHECKLIST_ITEMS,
+    MAX_CSV_FILE_BYTES,
+    MAX_CSV_ROWS,
+    MAX_IMAGE_PIXELS,
+    parse_checklist_csv,
+    parse_checklist_item_file,
+    parse_technical_csv,
+)
 
 
 class SecurityTestCase(unittest.TestCase):
@@ -708,6 +716,145 @@ class SecurityTestCase(unittest.TestCase):
                 self.assertEqual(len(export_json["technische_daten"]), 1)
                 self.assertEqual(len(export_json["checklisten"]), 1)
                 self.assertEqual(export_json["checklisten"][0]["items"][0]["text"], "Kette prüfen")
+
+    # --- Ressourcenlimits (Audit 2026-09-17): angemeldete Nutzer duerfen den Pi
+    # nicht mit einzelnen Requests in den OOM treiben.
+
+    def test_oversized_image_upload_is_rejected_before_decoding(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            app = self.build_app(tempdir)
+            app.config.update(WTF_CSRF_ENABLED=False)
+            with app.app_context():
+                user = User(username="bomber", email="bomber@example.com")
+                user.set_password("bomber-password")
+                db.session.add(user)
+                db.session.flush()
+                motorcycle = Motorcycle(user_id=user.id, marke="Honda", modell="CB500")
+                db.session.add(motorcycle)
+                db.session.commit()
+                user_id = user.id
+                motorcycle_id = motorcycle.id
+
+            client = app.test_client()
+            with client.session_transaction() as session:
+                session["_user_id"] = str(user_id)
+                session["_fresh"] = True
+
+            # Einfarbiges PNG knapp ueber dem Limit: wenige KB auf der Leitung,
+            # wuerde aber dekodiert ~3x MAX_IMAGE_PIXELS Bytes belegen.
+            side = int(MAX_IMAGE_PIXELS ** 0.5) + 1
+            bomb = BytesIO()
+            Image.new("RGB", (side, side), color=(0, 0, 0)).save(bomb, format="PNG", compress_level=9)
+            bomb.seek(0)
+            self.assertLess(len(bomb.getvalue()), 200 * 1024)
+
+            response = client.post(
+                f"/motorrad/{motorcycle_id}/bearbeiten",
+                data={"marke": "Honda", "modell": "CB500", "bilder": (bomb, "bomb.png")},
+                content_type="multipart/form-data",
+            )
+
+            self.assertEqual(response.status_code, 302)
+            with app.app_context():
+                self.assertEqual(MotorcycleImage.query.count(), 0)
+            leftovers = [path for path in Path(app.config["UPLOAD_FOLDER"]).rglob("*") if path.is_file()]
+            self.assertEqual(leftovers, [])
+
+    def test_csv_and_item_imports_are_capped(self):
+        many_rows = "\n".join(f"Motor;Wert {i};{i};ccm" for i in range(MAX_CSV_ROWS + 100))
+        technical = FileStorage(stream=BytesIO(many_rows.encode()), filename="datenblatt.csv")
+        self.assertEqual(len(parse_technical_csv(technical)), MAX_CSV_ROWS)
+
+        checklist_rows = "Titel;Pruefpunkt\n" + "\n".join(f"Service;Punkt {i}" for i in range(MAX_CSV_ROWS + 100))
+        checklist = FileStorage(stream=BytesIO(checklist_rows.encode()), filename="checklisten.csv")
+        self.assertEqual(len(parse_checklist_csv(checklist)), MAX_CSV_ROWS)
+
+        oversized = FileStorage(stream=BytesIO(b"a;b;c\n" * (MAX_CSV_FILE_BYTES // 6 + 10)), filename="gross.csv")
+        self.assertEqual(parse_technical_csv(oversized), [])
+
+        many_items = "\n".join(f"- Punkt {i}" for i in range(MAX_CHECKLIST_ITEMS + 50))
+        item_file = FileStorage(stream=BytesIO(many_items.encode()), filename="liste.txt")
+        self.assertEqual(len(parse_checklist_item_file(item_file)), MAX_CHECKLIST_ITEMS)
+
+    def test_checklist_form_items_are_capped(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            app = self.build_app(tempdir)
+            app.config.update(WTF_CSRF_ENABLED=False)
+            with app.app_context():
+                user = User(username="lister", email="lister@example.com")
+                user.set_password("lister-password")
+                db.session.add(user)
+                db.session.flush()
+                motorcycle = Motorcycle(user_id=user.id, marke="Honda", modell="CB500")
+                db.session.add(motorcycle)
+                db.session.commit()
+                user_id = user.id
+                motorcycle_id = motorcycle.id
+
+            client = app.test_client()
+            with client.session_transaction() as session:
+                session["_user_id"] = str(user_id)
+                session["_fresh"] = True
+
+            response = client.post(
+                f"/motorrad/{motorcycle_id}/checklisten/neu",
+                data={
+                    "titel": "Riesig",
+                    "item_text": [f"Punkt {i}" for i in range(MAX_CHECKLIST_ITEMS + 50)],
+                },
+            )
+            self.assertEqual(response.status_code, 302)
+            with app.app_context():
+                self.assertEqual(ServiceChecklistItem.query.count(), MAX_CHECKLIST_ITEMS)
+
+    def test_expired_auth_attempt_keys_are_pruned(self):
+        from app import auth
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            app = self.build_app(tempdir)
+            app.config.update(WTF_CSRF_ENABLED=False)
+            client = app.test_client()
+            for index in range(20):
+                client.post("/login", data={"email": f"probe{index}@example.com", "password": "x"})
+            self.assertGreaterEqual(len(auth.AUTH_ATTEMPTS), 20)
+
+            with patch("app.auth.monotonic", return_value=auth.monotonic() + auth.AUTH_RATE_LIMIT_WINDOW_SECONDS + 1):
+                client.post("/login", data={"email": "later@example.com", "password": "x"})
+
+            self.assertNotIn("probe0@example.com", " ".join(auth.AUTH_ATTEMPTS))
+            self.assertLessEqual(len(auth.AUTH_ATTEMPTS), 2)
+
+    def test_default_admin_password_is_flagged_until_changed(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            with self.assertLogs("app", level="WARNING") as logs:
+                app = self.build_app(tempdir, MOTODB_TRUST_PROXY_HEADERS="true")
+            self.assertTrue(any("Default-Passwort" in line for line in logs.output))
+            app.config.update(WTF_CSRF_ENABLED=False)
+            with app.app_context():
+                admin_id = User.query.filter_by(is_admin=True).one().id
+
+            client = app.test_client()
+            with client.session_transaction() as session:
+                session["_user_id"] = str(admin_id)
+                session["_fresh"] = True
+
+            self.assertIn(b"Standard-Passwort", client.get("/").data)
+
+            response = client.post(
+                "/account/password",
+                data={
+                    "current_password": "change-me-please",
+                    "password": "ein-eigenes-passwort",
+                    "password_confirm": "ein-eigenes-passwort",
+                },
+            )
+            self.assertEqual(response.status_code, 302)
+            self.assertNotIn(b"Standard-Passwort", client.get("/").data)
+
+            # Neustart mit geaendertem Passwort: keine Warnung mehr.
+            with self.assertNoLogs("app", level="WARNING"):
+                restarted = self.build_app(tempdir, MOTODB_TRUST_PROXY_HEADERS="true")
+            self.assertEqual(restarted.config.get("MOTODB_DEFAULT_PASSWORD_HASHES", {}), {})
 
 
 if __name__ == "__main__":

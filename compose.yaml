@@ -15,3 +15,14 @@ services:
       - /srv/motorrad-service/data:/data
     ports:
       - "127.0.0.1:5001:5001"
+    # Haertung: Ein Fehler oder Lastspitze in der App soll den Container
+    # treffen, nicht den ganzen Pi. Gunicorn startet einen per OOM beendeten
+    # Worker selbst neu. Memory-Limits brauchen den Memory-Cgroup-Controller
+    # (siehe deploy/README_RASPI.md).
+    mem_limit: 768m
+    memswap_limit: 768m
+    pids_limit: 256
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true

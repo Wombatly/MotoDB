@@ -721,6 +721,15 @@ Belege werden als Datei gespeichert und mit dem Originalnamen im
 Serviceeintrag referenziert. Bildbelege werden ebenfalls als `.jpg`
 normalisiert. Uploads sind auf maximal `32 MB` begrenzt.
 
+Ressourcenlimits (Schutz des Servers vor einzelnen großen Requests):
+
+| Was | Limit |
+| --- | --- |
+| Bilder | maximal `12` Megapixel (wird vor dem Dekodieren geprüft) |
+| CSV-Importe (Datenblatt, Checklisten) | `1 MB`, maximal `500` Zeilen |
+| Punkteliste einer Checkliste | `2 MB`, maximal `200` Prüfpunkte |
+| Nutzer-Export | wird ab `4 MB` auf die Platte ausgelagert statt im RAM gebaut |
+
 ## Backups
 
 Der Backup-Pfad wird in der App unter `Einstellungen → Daten und Backup`
