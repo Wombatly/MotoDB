@@ -193,13 +193,55 @@ def read_csv_text(file_storage, max_bytes=MAX_CSV_FILE_BYTES):
     return raw.decode("utf-8-sig", errors="ignore")
 
 
+# Spaltennamen, unter denen Checklisten-Importe den Pruefpunkt bzw. den
+# Kommentar liefern duerfen (Header werden vor dem Vergleich normalisiert).
+CHECKLIST_ITEM_KEYS = (
+    "pruefpunkt", "prüfpunkt", "punkt", "checkpunkt", "kontrollpunkt", "item",
+    "aufgabe", "arbeit", "arbeiten", "taetigkeit", "tätigkeit", "beschreibung",
+    "text", "name",
+)
+CHECKLIST_COMMENT_KEYS = ("kommentar", "comment")
+CHECKLIST_TITLE_KEYS = ("titel", "title", "checkliste", "service")
+CHECKLIST_INTERVAL_KEYS = ("intervall", "interval", "wartungsintervall", "serviceintervall")
+CHECKLIST_KM_KEYS = ("km", "intervallkm", "kilometer", "kilometerintervall")
+CHECKLIST_MONTH_KEYS = ("monate", "intervallmonate")
+# Spalten, die beim Fallback "irgendeine Spalte ist der Pruefpunkt" nicht
+# in Frage kommen.
+CHECKLIST_META_KEYS = frozenset(
+    ("motorrad", "motorcycle", "motorradid", "motorcycleid", "position", "pos")
+    + CHECKLIST_TITLE_KEYS + CHECKLIST_INTERVAL_KEYS + CHECKLIST_KM_KEYS
+    + CHECKLIST_MONTH_KEYS + CHECKLIST_COMMENT_KEYS
+)
+
+
+def sniff_delimiter(text):
+    sample = text[:1024]
+    return ";" if sample.count(";") > sample.count(",") else ","
+
+
+def normalize_csv_key(key):
+    return (key or "").strip().lower().replace("_", "").replace("-", "")
+
+
+def normalize_csv_row(row):
+    """DictReader-Zeile mit vereinheitlichten Schluesseln und getrimmten Werten."""
+    return {normalize_csv_key(key): (value or "").strip() for key, value in row.items()}
+
+
+def first_value(mapping, keys):
+    """Erster nicht-leerer Wert unter den angegebenen Schluesseln."""
+    for key in keys:
+        if mapping.get(key):
+            return mapping[key]
+    return None
+
+
 def parse_technical_csv(file_storage):
     text = read_csv_text(file_storage)
     if text is None:
         return []
 
-    sample = text[:1024]
-    delimiter = ";" if sample.count(";") > sample.count(",") else ","
+    delimiter = sniff_delimiter(text)
     rows = []
     reader = csv.reader(io.StringIO(text), delimiter=delimiter)
     for line in reader:
@@ -228,30 +270,16 @@ def parse_checklist_csv(file_storage):
     if text is None:
         return []
 
-    sample = text[:1024]
-    delimiter = ";" if sample.count(";") > sample.count(",") else ","
+    delimiter = sniff_delimiter(text)
     reader = csv.DictReader(io.StringIO(text), delimiter=delimiter)
     rows = []
     for line in reader:
         if len(rows) >= MAX_CSV_ROWS:
             break
-        normalized = {
-            (key or "").strip().lower().replace("_", "").replace("-", ""): (value or "").strip()
-            for key, value in line.items()
-        }
-        raw_interval = (
-            normalized.get("intervall")
-            or normalized.get("interval")
-            or normalized.get("wartungsintervall")
-            or normalized.get("serviceintervall")
-        )
-        raw_km = (
-            normalized.get("km")
-            or normalized.get("intervallkm")
-            or normalized.get("kilometer")
-            or normalized.get("kilometerintervall")
-        )
-        raw_months = normalized.get("monate") or normalized.get("intervallmonate")
+        normalized = normalize_csv_row(line)
+        raw_interval = first_value(normalized, CHECKLIST_INTERVAL_KEYS)
+        raw_km = first_value(normalized, CHECKLIST_KM_KEYS)
+        raw_months = first_value(normalized, CHECKLIST_MONTH_KEYS)
         intervall_km = raw_km
         intervall_monate = raw_months
         if raw_interval and raw_km and not raw_months:
@@ -266,74 +294,27 @@ def parse_checklist_csv(file_storage):
             else:
                 intervall_monate = raw_interval
 
-        title = (
-            normalized.get("titel")
-            or normalized.get("title")
-            or normalized.get("checkliste")
-            or normalized.get("service")
-            or raw_interval
-            or raw_km
-            or "Service-Checkliste"
-        )
-        item_text = (
-            normalized.get("pruefpunkt")
-            or normalized.get("prüfpunkt")
-            or normalized.get("punkt")
-            or normalized.get("checkpunkt")
-            or normalized.get("kontrollpunkt")
-            or normalized.get("item")
-            or normalized.get("aufgabe")
-            or normalized.get("arbeit")
-            or normalized.get("arbeiten")
-            or normalized.get("taetigkeit")
-            or normalized.get("tätigkeit")
-            or normalized.get("beschreibung")
-            or normalized.get("text")
-            or normalized.get("name")
-        )
+        title = first_value(normalized, CHECKLIST_TITLE_KEYS) or raw_interval or raw_km or "Service-Checkliste"
+        item_text = first_value(normalized, CHECKLIST_ITEM_KEYS)
         if not item_text:
-            ignored_keys = {
-                "motorrad",
-                "motorcycle",
-                "motorradid",
-                "motorcycleid",
-                "titel",
-                "title",
-                "checkliste",
-                "service",
-                "intervall",
-                "interval",
-                "wartungsintervall",
-                "serviceintervall",
-                "km",
-                "intervallkm",
-                "kilometer",
-                "kilometerintervall",
-                "monate",
-                "intervallmonate",
-                "position",
-                "pos",
-                "kommentar",
-                "comment",
-            }
-            fallback_values = [
-                value
-                for key, value in normalized.items()
-                if key not in ignored_keys and value
-            ]
-            item_text = fallback_values[0] if fallback_values else ""
+            # Unbekannte Spalte als Pruefpunkt nehmen, sofern sie nicht zu den
+            # Metadaten gehoert.
+            item_text = next(
+                (value for key, value in normalized.items() if value and key not in CHECKLIST_META_KEYS),
+                "",
+            )
         if not title or not item_text:
             continue
         rows.append(
             {
-                "motorrad": normalized.get("motorrad") or normalized.get("motorcycle"),
-                "motorrad_id": normalized.get("motorradid") or normalized.get("motorcycleid"),
+                "motorrad": first_value(normalized, ("motorrad", "motorcycle")),
+                "motorrad_id": first_value(normalized, ("motorradid", "motorcycleid")),
                 "titel": title,
                 "intervall_km": intervall_km,
                 "intervall_monate": intervall_monate,
-                "position": normalized.get("position") or normalized.get("pos"),
+                "position": first_value(normalized, ("position", "pos")),
                 "text": item_text,
-                "kommentar": normalized.get("kommentar") or normalized.get("comment"),
+                "kommentar": first_value(normalized, CHECKLIST_COMMENT_KEYS),
             }
         )
     return rows
@@ -344,9 +325,7 @@ def parse_checklist_item_file(file_storage):
         return []
 
     raw = file_storage.read(MAX_CHECKLIST_ITEM_FILE_BYTES + 1)
-    if not raw:
-        return []
-    if len(raw) > MAX_CHECKLIST_ITEM_FILE_BYTES:
+    if not raw or len(raw) > MAX_CHECKLIST_ITEM_FILE_BYTES:
         return []
 
     extension = Path(file_storage.filename).suffix.lower()
@@ -414,59 +393,20 @@ def parse_checklist_item_text(text, extension=""):
 
 
 def parse_checklist_item_csv(text):
-    sample = text[:1024]
-    delimiter = ";" if sample.count(";") > sample.count(",") else ","
+    delimiter = sniff_delimiter(text)
     raw_rows = list(csv.reader(io.StringIO(text), delimiter=delimiter))
     raw_rows = [[cell.strip() for cell in row] for row in raw_rows if any(cell.strip() for cell in row)]
     if not raw_rows:
         return []
 
-    header_keys = {
-        cell.lower().replace("_", "").replace("-", "")
-        for cell in raw_rows[0]
-    }
-    known_headers = {
-        "pruefpunkt",
-        "prüfpunkt",
-        "punkt",
-        "checkpunkt",
-        "kontrollpunkt",
-        "aufgabe",
-        "arbeit",
-        "arbeiten",
-        "taetigkeit",
-        "tätigkeit",
-        "beschreibung",
-        "text",
-        "name",
-        "kommentar",
-        "comment",
-    }
-    if header_keys & known_headers:
+    header_keys = {normalize_csv_key(cell) for cell in raw_rows[0]}
+    if header_keys & set(CHECKLIST_ITEM_KEYS + CHECKLIST_COMMENT_KEYS):
         reader = csv.DictReader(io.StringIO(text), delimiter=delimiter)
         rows = []
         for line in reader:
-            normalized = {
-                (key or "").strip().lower().replace("_", "").replace("-", ""): (value or "").strip()
-                for key, value in line.items()
-            }
-            point = (
-                normalized.get("pruefpunkt")
-                or normalized.get("prüfpunkt")
-                or normalized.get("punkt")
-                or normalized.get("checkpunkt")
-                or normalized.get("kontrollpunkt")
-                or normalized.get("aufgabe")
-                or normalized.get("arbeit")
-                or normalized.get("arbeiten")
-                or normalized.get("taetigkeit")
-                or normalized.get("tätigkeit")
-                or normalized.get("beschreibung")
-                or normalized.get("text")
-                or normalized.get("name")
-            )
-            comment = normalized.get("kommentar") or normalized.get("comment") or ""
-            point = clean_checklist_item_line(point or "")
+            normalized = normalize_csv_row(line)
+            point = clean_checklist_item_line(first_value(normalized, CHECKLIST_ITEM_KEYS) or "")
+            comment = first_value(normalized, CHECKLIST_COMMENT_KEYS) or ""
             if point or comment:
                 rows.append((point or "Prüfpunkt", comment))
         return rows

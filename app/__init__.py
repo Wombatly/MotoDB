@@ -352,7 +352,6 @@ def ensure_schema_updates():
 
 def ensure_admin(public_hosting=False):
     from app.models import User
-    from sqlalchemy.exc import IntegrityError
 
     admins = User.query.filter_by(is_admin=True).all()
     if admins:
@@ -376,30 +375,8 @@ def ensure_admin(public_hosting=False):
             )
         if len(admin_password) < 12:
             raise RuntimeError("MOTODB_ADMIN_PASSWORD muss mindestens 12 Zeichen lang sein.")
-
-        existing_user = User.query.filter(
-            db.or_(User.username == admin_username, User.email == admin_email)
-        ).first()
-        if existing_user:
-            existing_user.is_admin = True
-            existing_user.consent_accepted_at = existing_user.consent_accepted_at or utcnow()
-            existing_user.set_password(admin_password)
-            db.session.commit()
-            return
-
-        admin = User(
-            username=admin_username,
-            email=admin_email,
-            is_admin=True,
-            consent_accepted_at=utcnow(),
-        )
-        admin.set_password(admin_password)
-        db.session.add(admin)
-        try:
-            db.session.commit()
+        if upsert_admin(admin_username, admin_email, admin_password) is not None:
             print(f"Admin erstellt: {admin_email}")
-        except IntegrityError:
-            db.session.rollback()
         return
 
     if public_hosting:
@@ -408,29 +385,42 @@ def ensure_admin(public_hosting=False):
             "und MOTODB_ADMIN_PASSWORD an."
         )
 
+    admin = upsert_admin("admin", DEFAULT_ADMIN_EMAIL, DEFAULT_ADMIN_PASSWORD, reset_password=False)
+    if admin is not None:
+        print("WARNUNG: Default Admin erstellt: admin@localhost / change-me-please")
+        flag_default_admin_password(admin)
+
+
+def upsert_admin(username, email, password, reset_password=True):
+    """Admin anlegen oder einen bestehenden Nutzer mit diesem Namen/dieser E-Mail
+    zum Admin machen. Gibt den neu angelegten Nutzer zurueck, sonst None.
+
+    reset_password=False laesst das Passwort eines bestehenden Nutzers in Ruhe
+    (Default-Admin-Fall: ein vorhandenes "admin"-Konto behaelt sein Passwort).
+    """
+    from app.models import User
+    from sqlalchemy.exc import IntegrityError
+
     existing_user = User.query.filter(
-        db.or_(User.username == "admin", User.email == DEFAULT_ADMIN_EMAIL)
+        db.or_(User.username == username, User.email == email)
     ).first()
     if existing_user:
         existing_user.is_admin = True
         existing_user.consent_accepted_at = existing_user.consent_accepted_at or utcnow()
+        if reset_password:
+            existing_user.set_password(password)
         db.session.commit()
-        return
+        return None
 
-    admin = User(
-        username="admin",
-        email=DEFAULT_ADMIN_EMAIL,
-        is_admin=True,
-        consent_accepted_at=utcnow(),
-    )
-    admin.set_password(DEFAULT_ADMIN_PASSWORD)
+    admin = User(username=username, email=email, is_admin=True, consent_accepted_at=utcnow())
+    admin.set_password(password)
     db.session.add(admin)
     try:
         db.session.commit()
-        print("WARNUNG: Default Admin erstellt: admin@localhost / change-me-please")
-        flag_default_admin_password(admin)
     except IntegrityError:
         db.session.rollback()
+        return None
+    return admin
 
 
 def flag_default_admin_password(user):

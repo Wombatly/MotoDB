@@ -10,7 +10,7 @@
 <form method="post" enctype="multipart/form-data" class="form-panel">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <div class="mb-3">
-    {{ motorcycle_select(motorcycles, motorcycle, url_for('main.technical_data_global')) }}
+    {{ motorcycle_select(motorcycles, motorcycle, url_for('main.technical_data')) }}
   </div>
 
   <h2 class="h5 mb-3">Einlesen</h2>

@@ -39,6 +39,15 @@ def normalize_email(value):
     return email
 
 
+def password_problem(password, password_confirm):
+    """Meldung, wenn ein neues Passwort die Regeln verletzt; sonst None."""
+    if len(password) < 8:
+        return 'Das Passwort muss mindestens 8 Zeichen lang sein.'
+    if password != password_confirm:
+        return 'Die Passwörter stimmen nicht überein.'
+    return None
+
+
 def admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -132,18 +141,20 @@ def clear_auth_attempts(keys):
         AUTH_ATTEMPTS.pop(key, None)
 
 
+def user_motorcycle_ids(user_id):
+    return [row[0] for row in Motorcycle.query.with_entities(Motorcycle.id).filter_by(user_id=user_id)]
+
+
 def delete_user_uploads(user):
     upload_folder = Path(current_app.config['UPLOAD_FOLDER'])
-    motorcycle_ids = [
-        motorcycle_id
-        for (motorcycle_id,) in Motorcycle.query.with_entities(Motorcycle.id)
-        .filter_by(user_id=user.id)
-        .all()
-    ]
-    for motorcycle_id in motorcycle_ids:
+    for motorcycle_id in user_motorcycle_ids(user.id):
         motorcycle_upload_folder = upload_folder / str(motorcycle_id)
         if motorcycle_upload_folder.exists():
             shutil.rmtree(motorcycle_upload_folder)
+
+
+def _iso(value):
+    return value.isoformat() if value else None
 
 
 def export_folder_name(motorcycle, used_names):
@@ -203,12 +214,9 @@ def register():
             flash('Bitte bestätige die Datenschutzhinweise.', 'danger')
             return redirect(url_for('auth.register'))
 
-        if len(password) < 8:
-            flash('Passwort muss mindestens 8 Zeichen lang sein.', 'danger')
-            return redirect(url_for('auth.register'))
-
-        if password != password_confirm:
-            flash('Passwörter stimmen nicht überein.', 'danger')
+        problem = password_problem(password, password_confirm)
+        if problem:
+            flash(problem, 'danger')
             return redirect(url_for('auth.register'))
 
         if User.query.filter_by(username=username).first():
@@ -290,12 +298,9 @@ def change_password():
             flash('Das aktuelle Passwort ist falsch.', 'danger')
             return redirect(url_for('auth.change_password'))
 
-        if len(password) < 8:
-            flash('Das neue Passwort muss mindestens 8 Zeichen lang sein.', 'danger')
-            return redirect(url_for('auth.change_password'))
-
-        if password != password_confirm:
-            flash('Die neuen Passwörter stimmen nicht überein.', 'danger')
+        problem = password_problem(password, password_confirm)
+        if problem:
+            flash(problem, 'danger')
             return redirect(url_for('auth.change_password'))
 
         current_user.set_password(password)
@@ -393,13 +398,13 @@ def user_export():
                     {
                         'id': service.id,
                         'titel': service.titel,
-                        'datum': service.datum.isoformat() if service.datum else None,
+                        'datum': _iso(service.datum),
                         'kilometerstand': service.kilometerstand,
                         'beschreibung': service.beschreibung,
                         'kosten': service.kosten,
                         'kategorie': service.kategorie,
                         'naechster_service_km': service.naechster_service_km,
-                        'naechster_service_datum': service.naechster_service_datum.isoformat() if service.naechster_service_datum else None,
+                        'naechster_service_datum': _iso(service.naechster_service_datum),
                         'beleg_originalname': service.beleg_originalname,
                         'beleg_datei': receipt_archive,
                         'created_at': service.created_at.isoformat(),
@@ -464,12 +469,12 @@ def user_export():
                         'titel': checklist.titel,
                         'intervall_km': checklist.intervall_km,
                         'intervall_monate': checklist.intervall_monate,
-                        'datum': checklist.datum.isoformat() if checklist.datum else None,
+                        'datum': _iso(checklist.datum),
                         'kilometerstand': checklist.kilometerstand,
                         'anmerkungen': checklist.anmerkungen,
                         'is_template': checklist.is_template,
                         'source_template_id': checklist.source_template_id,
-                        'completed_at': checklist.completed_at.isoformat() if checklist.completed_at else None,
+                        'completed_at': _iso(checklist.completed_at),
                         'created_at': checklist.created_at.isoformat(),
                         'updated_at': checklist.updated_at.isoformat(),
                         'items': [
@@ -498,11 +503,11 @@ def user_export():
                     'hubraum': motorcycle.hubraum,
                     'ps': motorcycle.ps,
                     'farbe': motorcycle.farbe,
-                    'kaufdatum': motorcycle.kaufdatum.isoformat() if motorcycle.kaufdatum else None,
+                    'kaufdatum': _iso(motorcycle.kaufdatum),
                     'kennzeichen': motorcycle.kennzeichen,
                     'vin': motorcycle.vin,
-                    'erstzulassung': motorcycle.erstzulassung.isoformat() if motorcycle.erstzulassung else None,
-                    'verkauft_am': motorcycle.verkauft_am.isoformat() if motorcycle.verkauft_am else None,
+                    'erstzulassung': _iso(motorcycle.erstzulassung),
+                    'verkauft_am': _iso(motorcycle.verkauft_am),
                     'verkaufspreis': motorcycle.verkaufspreis,
                     'notizen': motorcycle.notizen,
                     'titelbild': motorcycle.bild,
