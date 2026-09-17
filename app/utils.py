@@ -5,6 +5,7 @@ import io
 from pathlib import Path
 import re
 from uuid import uuid4
+import warnings
 
 from flask import current_app
 from werkzeug.utils import secure_filename
@@ -15,8 +16,19 @@ except ImportError:
     Image = None
     ImageOps = None
 
+# Obergrenze fuer die Pixelzahl eines hochgeladenen Bildes. Pillows eigener
+# Schutz (MAX_IMAGE_PIXELS) warnt nur und wirft erst ab dem Doppelten einen
+# Fehler; wir pruefen die Groesse deshalb selbst, bevor dekodiert wird. Die
+# Ausgabe ist ohnehin auf 1600x1200 begrenzt, 12 MP reichen fuer jedes
+# Handyfoto. Ein einfarbiges 48-MP-PNG (wenige KB) wuerde sonst ~400 MB RAM
+# pro Request belegen.
+MAX_IMAGE_PIXELS = 12_000_000
+
 if Image is not None:
-    Image.MAX_IMAGE_PIXELS = 24_000_000
+    Image.MAX_IMAGE_PIXELS = MAX_IMAGE_PIXELS
+    # Pillows Warnung oberhalb von MAX_IMAGE_PIXELS wird zum Fehler, damit auch
+    # der Backstop hart abbricht statt nur zu loggen.
+    warnings.simplefilter("error", Image.DecompressionBombWarning)
 
 ALLOWED_IMAGE_FORMATS = ("JPEG", "PNG", "WEBP")
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
@@ -24,6 +36,13 @@ PDF_EXTENSION = ".pdf"
 MAX_CHECKLIST_ITEM_FILE_BYTES = 2 * 1024 * 1024
 MAX_PDF_PAGES = 20
 MAX_EXTRACTED_TEXT_CHARS = 100_000
+
+# Obergrenzen fuer CSV-/Listen-Importe. Ohne sie wuerde eine 32-MB-CSV (das
+# Request-Limit) Millionen ORM-Objekte im RAM und Zeilen in der SQLite erzeugen;
+# das Speicherlimit pro Account zaehlt nur den Upload-Ordner, nicht die DB.
+MAX_CSV_FILE_BYTES = 1024 * 1024
+MAX_CSV_ROWS = 500
+MAX_CHECKLIST_ITEMS = 200
 
 
 CATEGORIES = [
@@ -163,20 +182,29 @@ def parse_int(value):
     return int(digits) if digits else None
 
 
-def parse_technical_csv(file_storage):
+def read_csv_text(file_storage, max_bytes=MAX_CSV_FILE_BYTES):
+    """CSV-Upload als Text; None, wenn leer oder groesser als max_bytes."""
     if not file_storage or not file_storage.filename:
+        return None
+
+    raw = file_storage.read(max_bytes + 1)
+    if not raw or len(raw) > max_bytes:
+        return None
+    return raw.decode("utf-8-sig", errors="ignore")
+
+
+def parse_technical_csv(file_storage):
+    text = read_csv_text(file_storage)
+    if text is None:
         return []
 
-    raw = file_storage.read()
-    if not raw:
-        return []
-
-    text = raw.decode("utf-8-sig", errors="ignore")
     sample = text[:1024]
     delimiter = ";" if sample.count(";") > sample.count(",") else ","
     rows = []
     reader = csv.reader(io.StringIO(text), delimiter=delimiter)
     for line in reader:
+        if len(rows) >= MAX_CSV_ROWS:
+            break
         values = [value.strip() for value in line]
         if not values or not any(values):
             continue
@@ -196,19 +224,17 @@ def parse_technical_csv(file_storage):
 
 
 def parse_checklist_csv(file_storage):
-    if not file_storage or not file_storage.filename:
+    text = read_csv_text(file_storage)
+    if text is None:
         return []
 
-    raw = file_storage.read()
-    if not raw:
-        return []
-
-    text = raw.decode("utf-8-sig", errors="ignore")
     sample = text[:1024]
     delimiter = ";" if sample.count(";") > sample.count(",") else ","
     reader = csv.DictReader(io.StringIO(text), delimiter=delimiter)
     rows = []
     for line in reader:
+        if len(rows) >= MAX_CSV_ROWS:
+            break
         normalized = {
             (key or "").strip().lower().replace("_", "").replace("-", ""): (value or "").strip()
             for key, value in line.items()
@@ -331,7 +357,7 @@ def parse_checklist_item_file(file_storage):
 
     if not text.strip():
         return []
-    return parse_checklist_item_text(text, extension)
+    return parse_checklist_item_text(text, extension)[:MAX_CHECKLIST_ITEMS]
 
 
 def extract_pdf_text(raw):
@@ -520,6 +546,9 @@ def optimize_image(source_path, target_path, max_size=(1600, 1200), quality=82):
     with Image.open(source_path, formats=ALLOWED_IMAGE_FORMATS) as image:
         if image.format not in ALLOWED_IMAGE_FORMATS:
             raise ValueError("Unsupported image format")
+        width, height = image.size
+        if width * height > MAX_IMAGE_PIXELS:
+            raise ValueError("Image too large")
         image.verify()
 
     with Image.open(source_path, formats=ALLOWED_IMAGE_FORMATS) as image:

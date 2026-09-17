@@ -38,6 +38,12 @@
     </nav>
 
     <main class="container app-main py-3 py-md-4">
+      {% if uses_default_admin_password(current_user) %}
+        <div class="alert alert-warning" role="alert">
+          Dieses Admin-Konto nutzt noch das Standard-Passwort aus der Anleitung. Jeder im Netz kann sich damit anmelden –
+          bitte <a href="{{ url_for('auth.change_password') }}">jetzt ein eigenes Passwort setzen</a>.
+        </div>
+      {% endif %}
       {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
           <div class="flash-list" role="status" aria-live="polite">

@@ -1,6 +1,6 @@
 # MotoDB Audit-Report
 
-Datum: 2026-09-13
+Datum: 2026-09-13, Nachtrag 2026-09-17 (siehe unten)
 Umfang: Security, Korrektheit, Konsistenz (Code ↔ Doku ↔ Betrieb) und
 Veröffentlichungsreife.
 Vorheriger Report: 2026-06-07 (dieser Report ersetzt ihn).
@@ -159,3 +159,57 @@ angepasst; Service-Worker-Cache auf `motodb-v48`.
 Alle Punkte der Liste vom 2026-09-13 sind damit abgearbeitet. Verbleibend
 sind nur die bewusst zurückgestellten Themen (Sitzungs-Timeout, Rate-Limit
 pro Worker, Sicherungsort auf `/data` einschränken, Alembic-Migrationen).
+
+## Nachtrag 2026-09-17: Risiko für einen Raspberry Pi im Netz
+
+Fokus: Angriffsvektoren, die den ganzen Pi treffen (nicht nur die App). Der
+Betriebszustand wurde live geprüft: Container nur auf `127.0.0.1:5001`, nginx
+auf `:80` (HTTP, LAN), Tailscale `serve` tailnet-only (kein Funnel; proxyt an
+nginx vorbei direkt auf 5001), `MOTODB_TRUST_PROXY_HEADERS=true`,
+Registrierung offen. Auth-, CSRF-, Pfad- und Upload-Checks: keine neuen
+Befunde.
+
+### Behoben (Code)
+
+1. **Bild-Decompression-Bomb.** `Image.MAX_IMAGE_PIXELS` warnte bis zum
+   Doppelten nur; ein einfarbiges 48-MP-PNG (wenige KB) belegte dekodiert
+   ~400 MB pro Request, acht parallel überfordern einen 4-GB-Pi. Fix: Limit
+   12 MP, Prüfung von `width*height` vor dem Dekodieren, Pillow-Warnung wird
+   zum Fehler (`app/utils.py`).
+2. **CSV-Importe ohne Zeilenlimit.** 32-MB-CSV → Millionen ORM-Objekte und
+   DB-Zeilen; das Speicherlimit zählt nur Uploads, nicht die DB. Fix: 1 MB /
+   500 Zeilen für Datenblatt- und Checklisten-CSV, 200 Punkte je Checkliste
+   (Datei und Formular), Datenblatt auf 500 Einträge (`app/utils.py`,
+   `app/routes.py`).
+3. **`/user/export` baute das ZIP komplett im RAM** (bis Speicherlimit +
+   PDFs, parallel aufrufbar). Fix: `SpooledTemporaryFile`, ab 4 MB auf Platte
+   (`app/auth.py`).
+4. **`AUTH_ATTEMPTS` wuchs unbegrenzt** (ein Key je probierter E-Mail, nie
+   aufgeräumt). Fix: abgelaufene Keys werden bei jedem Auth-Request entfernt.
+5. **Default-Admin-Passwort im Heimnetz-Modus stillschweigend erlaubt.** Fix:
+   Log-Warnung beim Start und Banner für den betroffenen Admin auf jeder
+   Seite, bis das Passwort geändert ist (Hash-Vergleich, wirkt in allen
+   Gunicorn-Workern ohne Abstimmung).
+6. **Container ohne Ressourcenlimits.** Fix: `compose.yaml` mit
+   `mem_limit`/`memswap_limit` 768 MB, `pids_limit` 256, `cap_drop: ALL`,
+   `no-new-privileges`; `docker run`-Variante in `deploy/README_RASPI.md`.
+
+Verifikation: `docker build --target test .` → pyflakes sauber, **41 Tests
+OK** (36 bestehende + 5 neue).
+
+### Betrieb (außerhalb des Repos, vom Betreiber zu erledigen)
+
+- **Portainer auf `0.0.0.0:9443` mit `/var/run/docker.sock`** – wer
+  Portainer übernimmt, hat root auf dem Pi; Docker-Ports umgehen ufw. An die
+  Tailscale-IP oder `127.0.0.1` binden, Image regelmäßig aktualisieren.
+- **SSH-Passwort-Login** prüfen (`sudo sshd -T | grep -i passwordauth`),
+  Key-only bevorzugen.
+- **Default-Admin-Passwort** prüfen bzw. nach dem Deploy auf das Banner
+  achten.
+- `apply-config.sh` (docker run) um die Limits aus `compose.yaml` ergänzen.
+
+### Weiterhin bewusst offen
+
+Sitzungs-Timeout, Passwortwechsel loggt andere Sitzungen nicht aus,
+Rate-Limit pro Worker, HTTP-Klartext im LAN (über Tailscale HTTPS),
+Alembic-Migrationen.

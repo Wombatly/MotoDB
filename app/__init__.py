@@ -100,6 +100,8 @@ def create_app():
         from app.models import User
         return db.session.get(User, int(user_id))
 
+    app.add_template_global(uses_default_admin_password, "uses_default_admin_password")
+
     @app.after_request
     def add_security_headers(response):
         response.headers.setdefault("Content-Security-Policy", security_policy())
@@ -352,12 +354,15 @@ def ensure_admin(public_hosting=False):
     from app.models import User
     from sqlalchemy.exc import IntegrityError
 
-    admin_user = User.query.filter_by(is_admin=True).first()
-    if admin_user:
-        if public_hosting and admin_user.check_password(DEFAULT_ADMIN_PASSWORD):
-            raise RuntimeError(
-                "Aendere das bekannte Default-Admin-Passwort, bevor MOTODB_PUBLIC_HOSTING aktiv ist."
-            )
+    admins = User.query.filter_by(is_admin=True).all()
+    if admins:
+        for admin_user in admins:
+            if admin_user.check_password(DEFAULT_ADMIN_PASSWORD):
+                if public_hosting:
+                    raise RuntimeError(
+                        "Aendere das bekannte Default-Admin-Passwort, bevor MOTODB_PUBLIC_HOSTING aktiv ist."
+                    )
+                flag_default_admin_password(admin_user)
         return
 
     admin_username = os.environ.get("MOTODB_ADMIN_USERNAME", "").strip()
@@ -423,8 +428,38 @@ def ensure_admin(public_hosting=False):
     try:
         db.session.commit()
         print("WARNUNG: Default Admin erstellt: admin@localhost / change-me-please")
+        flag_default_admin_password(admin)
     except IntegrityError:
         db.session.rollback()
+
+
+def flag_default_admin_password(user):
+    """Merkt sich, dass dieser Admin noch das bekannte Default-Passwort nutzt.
+
+    Im Heimnetz-Modus blockiert das den Start nicht, aber jeder im Netz kennt
+    die Kombination aus der Doku. Der Admin sieht deshalb auf jeder Seite einen
+    Hinweis. Gemerkt wird der Hash: sobald das Passwort (in irgendeinem
+    Gunicorn-Worker) geaendert wurde, passt der Hash nicht mehr und der Hinweis
+    verschwindet ueberall ohne weitere Abstimmung.
+    """
+    from flask import current_app
+
+    current_app.config.setdefault("MOTODB_DEFAULT_PASSWORD_HASHES", {})[user.id] = user.password_hash
+    current_app.logger.warning(
+        "Admin-Konto %s nutzt noch das Default-Passwort '%s'. Bitte umgehend aendern.",
+        user.email,
+        DEFAULT_ADMIN_PASSWORD,
+    )
+
+
+def uses_default_admin_password(user):
+    """Fuer das Banner in base.html: Nutzer ist als Default-Passwort-Admin gemerkt."""
+    if not user or not user.is_authenticated:
+        return False
+    from flask import current_app
+
+    known_hash = current_app.config.get("MOTODB_DEFAULT_PASSWORD_HASHES", {}).get(user.id)
+    return known_hash is not None and known_hash == user.password_hash
 
 
 def ensure_default_settings():

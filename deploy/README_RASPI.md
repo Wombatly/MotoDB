@@ -153,6 +153,23 @@ App intern prüfen:
 curl -I http://127.0.0.1:5001
 ```
 
+### Container-Härtung
+
+`compose.yaml` begrenzt den Container auf 768 MB RAM (ohne Swap), 256 Prozesse,
+entfernt alle Linux-Capabilities und verbietet Privilegien-Eskalation. Wer den
+Container stattdessen per `docker run` startet, gibt dieselben Optionen mit:
+
+```bash
+docker run -d --name motorrad-service --restart unless-stopped \
+  -p 127.0.0.1:5001:5001 -v /srv/motorrad-service/data:/data --env-file .env \
+  --memory 768m --memory-swap 768m --pids-limit 256 \
+  --cap-drop ALL --security-opt no-new-privileges \
+  app-motorrad-service
+```
+
+Ohne diese Limits kann ein einzelner angemeldeter Nutzer mit parallelen
+Uploads oder Exporten den gesamten Arbeitsspeicher des Pi belegen.
+
 ## 8. Nginx einrichten
 
 ```bash

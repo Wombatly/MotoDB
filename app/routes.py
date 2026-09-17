@@ -36,6 +36,8 @@ from app.models import (
 )
 from app.utils import (
     CATEGORIES,
+    MAX_CHECKLIST_ITEMS,
+    MAX_CSV_ROWS,
     SERVICE_CHECKLIST_PRESETS,
     TECHNICAL_SPEC_SUGGESTIONS,
     InvalidDateError,
@@ -1454,6 +1456,7 @@ def create_checklist_from_form(motorcycle):
         rows = [(item, "") for item in preset.get("items", [])]
 
     rows.extend(parse_checklist_item_file(request.files.get("item_list_file")))
+    rows = rows[:MAX_CHECKLIST_ITEMS]
 
     for position, (text, comment) in enumerate(rows, start=1):
         db.session.add(
@@ -1485,6 +1488,7 @@ def update_checklist_from_form(checklist):
         if not text and not comment:
             continue
         rows.append((text or "Prüfpunkt", comment))
+    rows = rows[:MAX_CHECKLIST_ITEMS]
 
     for position, (text, comment) in enumerate(rows, start=1):
         db.session.add(
@@ -1591,7 +1595,7 @@ def save_technical_specs(motorcycle):
 
     rows.extend(parse_technical_csv(request.files.get("csv_file")))
 
-    merged_rows = list(merge_technical_rows(rows))
+    merged_rows = list(merge_technical_rows(rows))[:MAX_CSV_ROWS]
     if not merged_rows:
         return
 
