@@ -102,7 +102,7 @@ Betrieb auf einem Raspberry Pi per Docker und Nginx bereitgestellt werden.
 
 ## Technik-Stack
 
-- Python 3.12
+- Python 3.14
 - Flask 3
 - Flask-SQLAlchemy
 - SQLite
@@ -199,7 +199,7 @@ Deployments und Backups besonders geschützt werden.
 
 ### Voraussetzungen
 
-- Python 3.12
+- Python 3.14
 - `pip`
 - Optional: virtuelles Environment
 
@@ -839,7 +839,7 @@ docker build --target test .
 ### Continuous Integration
 
 `.github/workflows/ci.yml` läuft bei jedem Push auf `main` und bei Pull
-Requests: `pyflakes` + Unit-Tests unter Python 3.12, danach Docker-Build der
+Requests: `pyflakes` + Unit-Tests unter Python 3.14, danach Docker-Build der
 Test-Stage und des Runtime-Images inklusive Start als Nicht-Root und Warten
 auf `healthy`.
 
