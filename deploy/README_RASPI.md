@@ -221,6 +221,9 @@ cd /srv/motorrad-service/app
 docker compose up -d --build
 ```
 
+Sicherung vor dem Update, Rollback sowie System- und Portainer-Updates:
+siehe `deploy/UPDATE_RASPI.md`.
+
 ## 12. Nützliche Befehle
 
 ```bash
