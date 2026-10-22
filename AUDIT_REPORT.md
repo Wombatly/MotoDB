@@ -1,6 +1,6 @@
 # MotoDB Audit-Report
 
-Datum: 2026-09-13, Nachtrag 2026-09-17 (siehe unten)
+Datum: 2026-09-13, Nachträge 2026-09-17 und 2026-10-22 (siehe unten)
 Umfang: Security, Korrektheit, Konsistenz (Code ↔ Doku ↔ Betrieb) und
 Veröffentlichungsreife.
 Vorheriger Report: 2026-06-07 (dieser Report ersetzt ihn).
@@ -213,3 +213,43 @@ OK** (36 bestehende + 5 neue).
 Sitzungs-Timeout, Passwortwechsel loggt andere Sitzungen nicht aus,
 Rate-Limit pro Worker, HTTP-Klartext im LAN (über Tailscale HTTPS),
 Alembic-Migrationen.
+
+## Nachtrag 2026-10-22: Abhängigkeits- und Host-Updates
+
+Anlass: Update-Prüfung aller Bausteine. `pip-audit` meldete gegen die
+September-Pins 36 Advisories (Pillow, pypdf, Werkzeug).
+
+### App (PR #34 und #35, gemergt und deployt)
+
+| Paket | vorher | jetzt | Anmerkung |
+|---|---|---|---|
+| Pillow | 12.2.0 | 13.0.0 | 9 CVEs; GIF/MSP/PDF-Parser waren durch `formats=` nicht erreichbar |
+| pypdf | 6.13.2 | 6.21.2 | präparierte PDFs (Endlosschleifen, Speicherspitzen) in `extract_pdf_text` |
+| Werkzeug | 3.1.8 | 3.1.9 | `safe_join` mit Windows-Gerätenamen |
+| fpdf2 / gunicorn | 2.8.7 / 26.0.0 | 2.8.9 / 26.2.0 | Bugfixes |
+| Python (Image, CI) | 3.12 | 3.14 | 3.12 bekommt nur noch Sicherheitsfixes |
+
+Transitiv: SQLAlchemy 2.0.52 → 2.1.6. CI-Actions auf Node-24-Versionen
+(checkout v7, setup-python v7, setup-buildx v4, build-push v7).
+
+Verifikation: Test-Stage mit Python 3.14.9 → pyflakes sauber, **43 Tests OK**,
+keine DeprecationWarnings; CI grün; nach dem Deploy Container `healthy`,
+`/health` und `/login` über nginx 200, SQLite-Integrität `ok`. Sicherung vor
+dem Deploy: `data/backups/pre-updates-deploy_20261022_101524`.
+
+### Host (vom Betreiber bzw. mit Freigabe erledigt)
+
+- `apt full-upgrade` + Neustart: Kernel 6.18.50, nginx `1.26.3-3+deb13u10`,
+  OpenSSH `10.0p1-7+deb13u4`, OpenSSL 3.5.7, sudo `deb13u2`, Docker 29.9.2.
+  Danach keine ausstehenden Updates.
+- Portainer 2.39.2 → 2.45.3 (Volume-Sicherung vorher, `InstanceID`
+  unverändert). Bindung weiterhin nur an die Tailscale-IP; der Punkt
+  „Portainer auf `0.0.0.0:9443`“ aus dem Nachtrag 2026-09-17 ist damit
+  erledigt, ebenso Key-only-SSH.
+- Ablauf für künftige Updates inkl. Sicherung und Rollback:
+  `deploy/UPDATE_RASPI.md`.
+
+### Weiterhin offen
+
+Unverändert die Punkte aus „Weiterhin bewusst offen“ oben sowie die
+Compose-↔-`docker run`-Doppelung im Betrieb.
